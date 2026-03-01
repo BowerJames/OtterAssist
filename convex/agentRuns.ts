@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 
@@ -92,5 +92,24 @@ export const getActiveRun = query({
       .withIndex("by_status", (q) => q.eq("status", "running"))
       .filter((q) => q.eq(q.field("agentId"), args.agentId))
       .first();
+  },
+});
+
+export const createRunInternal = internalMutation({
+  args: {
+    agentId: v.id("agents"),
+    triggerType: v.union(v.literal("manual"), v.literal("scheduled"), v.literal("event")),
+    triggerData: v.optional(v.record(v.string(), v.any())),
+    instructions: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("agentRuns", {
+      agentId: args.agentId,
+      triggerType: args.triggerType,
+      triggerData: args.triggerData,
+      instructions: args.instructions,
+      status: "pending",
+      startedAt: Date.now(),
+    });
   },
 });

@@ -1,5 +1,6 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
 export const queueEvent = mutation({
   args: {
@@ -97,6 +98,34 @@ export const createEventFromSchedule = internalMutation({
       agentId: args.agentId,
       status: "pending",
       createdAt: Date.now(),
+    });
+  },
+});
+
+export const triggerScheduledRun = internalAction({
+  args: {
+    agentName: v.string(),
+    instructions: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.runQuery(internal.agents.getAgentByName, {
+      name: args.agentName,
+    });
+
+    if (!agent) {
+      throw new Error(`Agent not found: ${args.agentName}`);
+    }
+
+    const eventId = await ctx.runMutation(internal.events.createEventFromSchedule, {
+      type: "scheduled",
+      agentId: agent._id,
+    });
+
+    await ctx.runMutation(internal.agentRuns.createRunInternal, {
+      agentId: agent._id,
+      triggerType: "scheduled",
+      triggerData: { eventId },
+      instructions: args.instructions,
     });
   },
 });
