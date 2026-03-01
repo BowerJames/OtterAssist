@@ -1,5 +1,6 @@
-import { mutation, query, internalQuery } from "./_generated/server";
+import { mutation, query, internalQuery, internalAction } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
 export const createAgent = mutation({
   args: {
@@ -80,5 +81,17 @@ export const getAgentInternal = internalQuery({
   },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.agentId);
+  },
+});
+
+export const getAgentByName = internalQuery({
+  args: {
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("agents")
+      .filter((q) => q.eq(q.field("name"), args.name))
+      .first();
   },
 });
