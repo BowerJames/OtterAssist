@@ -10,3 +10,4 @@ export {
   writeMessageTool,
   markReadTool,
 } from "./convex";
+export { createDefaultToolRegistry, createToolRegistryForTools } from "./factory";
