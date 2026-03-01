@@ -2,6 +2,8 @@ export interface ToolResult {
   success: boolean;
   output?: string;
   error?: string;
+  exitCode?: number;
+  truncated?: boolean;
 }
 
 export interface ToolParameters extends Record<string, unknown> {
