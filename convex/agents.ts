@@ -75,7 +75,16 @@ export const getAgent = query({
   },
 });
 
-export const getAgentInternal = internalQuery({
+export const getAgentInternal = query({
+  args: {
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.agentId);
+  },
+});
+
+export const getAgentInternalQuery = internalQuery({
   args: {
     agentId: v.id("agents"),
   },
@@ -93,5 +102,15 @@ export const getAgentByName = internalQuery({
       .query("agents")
       .filter((q) => q.eq(q.field("name"), args.name))
       .first();
+  },
+});
+
+export const listAgentsWithFileTriggers = query({
+  args: {},
+  handler: async (ctx) => {
+    const agents = await ctx.db.query("agents").collect();
+    return agents.filter(
+      (agent) => agent.isActive && agent.fileTriggers && agent.fileTriggers.length > 0
+    );
   },
 });

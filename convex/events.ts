@@ -37,6 +37,33 @@ export const markEventFailed = mutation({
   },
 });
 
+export const markEventProcessing = internalMutation({
+  args: {
+    eventId: v.id("events"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.eventId, { status: "processing" });
+  },
+});
+
+export const claimNextEvent = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const event = await ctx.db
+      .query("events")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .order("asc")
+      .first();
+
+    if (!event) {
+      return null;
+    }
+
+    await ctx.db.patch(event._id, { status: "processing" });
+    return event;
+  },
+});
+
 export const listPendingEvents = query({
   args: {},
   handler: async (ctx) => {
@@ -121,7 +148,7 @@ export const triggerScheduledRun = internalAction({
       agentId: agent._id,
     });
 
-    await ctx.runMutation(internal.agentRuns.createRunInternal, {
+    await ctx.runMutation(internal.agentRuns.createRunInternalForConvex, {
       agentId: agent._id,
       triggerType: "scheduled",
       triggerData: { eventId },

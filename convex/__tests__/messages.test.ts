@@ -191,27 +191,21 @@ describe("Messages Module", () => {
     });
 
     test("should return only unread messages", async () => {
-      const messages = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.listUnread, {});
-      });
+      const messages = await t.query(api.messages.listUnread, {});
 
       expect(messages.length).toBe(2);
       expect(messages.every((m: any) => m.read === false)).toBe(true);
     });
 
     test("should filter by channel", async () => {
-      const messages = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.listUnread, { channel: "general" });
-      });
+      const messages = await t.query(api.messages.listUnread, { channel: "general" });
 
       expect(messages.length).toBe(1);
       expect(messages[0].content).toBe("Unread 1");
     });
 
     test("should respect limit", async () => {
-      const messages = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.listUnread, { limit: 1 });
-      });
+      const messages = await t.query(api.messages.listUnread, { limit: 1 });
 
       expect(messages.length).toBe(1);
     });
@@ -238,7 +232,7 @@ describe("Messages Module", () => {
 
     test("should search with regex pattern", async () => {
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           pattern: "^Hello",
         });
       });
@@ -249,7 +243,7 @@ describe("Messages Module", () => {
 
     test("should search with case-insensitive flag", async () => {
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           pattern: "hello",
           patternFlags: "i",
         });
@@ -260,7 +254,7 @@ describe("Messages Module", () => {
 
     test("should filter by role", async () => {
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           role: "assistant",
         });
       });
@@ -271,7 +265,7 @@ describe("Messages Module", () => {
 
     test("should filter by tags (any match)", async () => {
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           tags: ["greeting"],
         });
       });
@@ -287,7 +281,7 @@ describe("Messages Module", () => {
       });
 
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           tagsAll: ["greeting", "special"],
         });
       });
@@ -298,7 +292,7 @@ describe("Messages Module", () => {
 
     test("should filter by channel", async () => {
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           channel: "random",
         });
       });
@@ -309,7 +303,7 @@ describe("Messages Module", () => {
 
     test("should filter by read status", async () => {
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           read: false,
         });
       });
@@ -319,7 +313,7 @@ describe("Messages Module", () => {
 
     test("should respect limit", async () => {
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           limit: 2,
         });
       });
@@ -330,7 +324,7 @@ describe("Messages Module", () => {
 
     test("should paginate with cursor", async () => {
       const page1 = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           limit: 2,
         });
       });
@@ -338,7 +332,7 @@ describe("Messages Module", () => {
       expect(page1.messages.length).toBe(2);
 
       const page2 = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           limit: 2,
           cursor: page1.cursor,
         });
@@ -359,7 +353,7 @@ describe("Messages Module", () => {
       });
 
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           since: oneHourAgo,
         });
       });
@@ -377,7 +371,7 @@ describe("Messages Module", () => {
       });
 
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           until: futureTime,
         });
       });
@@ -410,7 +404,7 @@ describe("Messages Module", () => {
     test("should get messages before a target message", async () => {
       const targetId = messages[2]._id;
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           before: targetId,
           contextSize: 2,
         });
@@ -422,7 +416,7 @@ describe("Messages Module", () => {
     test("should get messages after a target message", async () => {
       const targetId = messages[2]._id;
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           after: targetId,
           contextSize: 2,
         });
@@ -434,7 +428,7 @@ describe("Messages Module", () => {
     test("should get messages around a target message (split context)", async () => {
       const targetId = messages[2]._id;
       const result = await t.run(async (ctx) => {
-        return await ctx.runQuery(internal.messages.search, {
+        return await ctx.runQuery(api.messages.search, {
           around: targetId,
           contextSize: 4,
         });

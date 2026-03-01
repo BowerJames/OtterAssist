@@ -95,7 +95,64 @@ export const getActiveRun = query({
   },
 });
 
-export const createRunInternal = internalMutation({
+export const createRunInternal = mutation({
+  args: {
+    agentId: v.id("agents"),
+    triggerType: v.union(v.literal("manual"), v.literal("scheduled"), v.literal("event")),
+    triggerData: v.optional(v.record(v.string(), v.any())),
+    instructions: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("agentRuns", {
+      agentId: args.agentId,
+      triggerType: args.triggerType,
+      triggerData: args.triggerData,
+      instructions: args.instructions,
+      status: "pending",
+      startedAt: Date.now(),
+    });
+  },
+});
+
+export const updateRunStatusInternal = mutation({
+  args: {
+    runId: v.id("agentRuns"),
+    status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.runId, { status: args.status });
+  },
+});
+
+export const setRunErrorInternal = mutation({
+  args: {
+    runId: v.id("agentRuns"),
+    error: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.runId, {
+      status: "failed",
+      error: args.error,
+      completedAt: Date.now(),
+    });
+  },
+});
+
+export const setRunCompletedInternal = mutation({
+  args: {
+    runId: v.id("agentRuns"),
+    trajectoryPath: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.runId, {
+      status: "completed",
+      trajectoryPath: args.trajectoryPath,
+      completedAt: Date.now(),
+    });
+  },
+});
+
+export const createRunInternalForConvex = internalMutation({
   args: {
     agentId: v.id("agents"),
     triggerType: v.union(v.literal("manual"), v.literal("scheduled"), v.literal("event")),

@@ -74,7 +74,7 @@ http.route({
     };
 
     try {
-      const agent = await ctx.runQuery(internal.agents.getAgentInternal, {
+      const agent = await ctx.runQuery(internal.agents.getAgentInternalQuery, {
         agentId: agentId as Id<"agents">,
       });
 
