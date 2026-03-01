@@ -17,3 +17,6 @@ export type { LLMTool, LLMProvider } from "./provider";
 
 export { OpenAIProvider } from "./openai";
 export type { OpenAIProviderOptions } from "./openai";
+
+export { AnthropicProvider } from "./anthropic";
+export type { AnthropicProviderOptions } from "./anthropic";
