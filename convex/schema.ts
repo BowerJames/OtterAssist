@@ -9,6 +9,14 @@ export default defineSchema({
     llmModel: v.string(),
     tools: v.array(v.string()),
     isActive: v.boolean(),
+    fileTriggers: v.optional(
+      v.array(
+        v.object({
+          pattern: v.string(),
+          events: v.array(v.string()),
+        })
+      )
+    ),
   }),
 
   messages: defineTable({
@@ -44,8 +52,8 @@ export default defineSchema({
     type: v.string(),
     payload: v.optional(v.record(v.string(), v.any())),
     agentId: v.optional(v.id("agents")),
-    status: v.union(v.literal("pending"), v.literal("processed"), v.literal("failed")),
+    status: v.union(v.literal("pending"), v.literal("processing"), v.literal("processed"), v.literal("failed")),
     createdAt: v.number(),
   })
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
 });
