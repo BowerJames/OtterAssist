@@ -3,6 +3,15 @@ import { resolve, normalize } from "node:path";
 
 const OTTER_ASSIST_HOME_ENV = "OTTER_ASSIST_HOME";
 const DEFAULT_HOME_NAME = ".otter_assist";
+const CONVEX_URL_ENV = "CONVEX_URL";
+
+export function getConvexUrl(): string {
+  const url = process.env[CONVEX_URL_ENV];
+  if (!url) {
+    throw new Error("CONVEX_URL environment variable is not set");
+  }
+  return url;
+}
 
 export function getOtterAssistHome(): string {
   const envHome = process.env[OTTER_ASSIST_HOME_ENV];
