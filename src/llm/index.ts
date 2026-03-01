@@ -2,6 +2,10 @@ export type {
   LLMRole,
   LLMFinishReason,
   LLMToolCall,
+  LLMTextPart,
+  LLMImagePart,
+  LLMAudioPart,
+  LLMContentPart,
   LLMMessage,
   LLMUsage,
   LLMResponse,
@@ -10,3 +14,6 @@ export type {
 } from "./types";
 
 export type { LLMTool, LLMProvider } from "./provider";
+
+export { OpenAIProvider } from "./openai";
+export type { OpenAIProviderOptions } from "./openai";
