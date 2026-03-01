@@ -50,7 +50,7 @@ export function validateWorkspacePath(subpath: string): string {
 }
 
 export interface OtterAssistConfig {
-  llmProvider?: "openai" | "anthropic";
+  llmProvider?: "openai" | "anthropic" | "zai-coding-plan";
   llmModel?: string;
   logLevel?: "debug" | "info" | "warn" | "error";
   eventPollIntervalMs?: number;
