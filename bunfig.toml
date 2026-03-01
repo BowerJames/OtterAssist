@@ -1,0 +1,5 @@
+[run]
+preload = [".env"]
+
+[install]
+exact = true
