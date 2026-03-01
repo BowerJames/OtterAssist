@@ -20,3 +20,6 @@ export type { OpenAIProviderOptions } from "./openai";
 
 export { AnthropicProvider } from "./anthropic";
 export type { AnthropicProviderOptions } from "./anthropic";
+
+export { createLLMProvider, getDefaultModel } from "./factory";
+export type { LLMProviderConfig, LLMProviderName } from "./factory";

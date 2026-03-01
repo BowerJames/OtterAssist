@@ -7,7 +7,9 @@
     "dev": "bun run src/service/index.ts",
     "convex": "convex dev",
     "build": "bun build src/service/index.ts --outdir dist",
-    "setup": "bun run scripts/setup.ts"
+    "setup": "bun run scripts/setup.ts",
+    "service": "bun run src/service/index.ts",
+    "service:dev": "bun --hot run src/service/index.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.78.0",

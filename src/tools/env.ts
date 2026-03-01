@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { resolve, normalize } from "node:path";
+import { mkdir } from "node:fs/promises";
 
 const OTTER_ASSIST_HOME_ENV = "OTTER_ASSIST_HOME";
 const DEFAULT_HOME_NAME = ".otter_assist";
@@ -46,4 +47,84 @@ export function validateWorkspacePath(subpath: string): string {
   }
 
   return normalized;
+}
+
+export interface OtterAssistConfig {
+  llmProvider?: "openai" | "anthropic";
+  llmModel?: string;
+  logLevel?: "debug" | "info" | "warn" | "error";
+  eventPollIntervalMs?: number;
+  fileWatcherDebounceMs?: number;
+}
+
+const DEFAULT_CONFIG: OtterAssistConfig = {
+  llmProvider: "openai",
+  llmModel: "gpt-4o",
+  logLevel: "info",
+  eventPollIntervalMs: 1000,
+  fileWatcherDebounceMs: 100,
+};
+
+export function getConfigPath(): string {
+  return resolve(getOtterAssistHome(), "config.json");
+}
+
+export function getLogsPath(subpath?: string): string {
+  const home = getOtterAssistHome();
+  const logs = resolve(home, "logs");
+  if (!subpath) {
+    return logs;
+  }
+  return resolve(logs, subpath);
+}
+
+export function getTrajectoriesPath(): string {
+  return getLogsPath("trajectories");
+}
+
+export async function ensureDirectories(): Promise<void> {
+  const dirs = [
+    getOtterAssistHome(),
+    getWorkspacePath(),
+    getLogsPath(),
+    getTrajectoriesPath(),
+  ];
+
+  for (const dir of dirs) {
+    await mkdir(dir, { recursive: true });
+  }
+}
+
+export async function loadConfig(): Promise<OtterAssistConfig> {
+  const configPath = getConfigPath();
+
+  try {
+    const file = Bun.file(configPath);
+    if (!(await file.exists())) {
+      return { ...DEFAULT_CONFIG };
+    }
+    const content = await file.json();
+    return { ...DEFAULT_CONFIG, ...content };
+  } catch {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+export async function saveConfig(config: OtterAssistConfig): Promise<void> {
+  const configPath = getConfigPath();
+  await ensureDirectories();
+  await Bun.write(configPath, JSON.stringify(config, null, 2));
+}
+
+export async function ensureConfig(): Promise<OtterAssistConfig> {
+  await ensureDirectories();
+  const configPath = getConfigPath();
+  const file = Bun.file(configPath);
+
+  if (!(await file.exists())) {
+    await saveConfig(DEFAULT_CONFIG);
+    return { ...DEFAULT_CONFIG };
+  }
+
+  return loadConfig();
 }
