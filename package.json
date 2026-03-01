@@ -1,0 +1,19 @@
+{
+  "name": "otterassist",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "bun run src/service/index.ts",
+    "convex": "convex dev",
+    "build": "bun build src/service/index.ts --outdir dist",
+    "setup": "bun run scripts/setup.ts"
+  },
+  "dependencies": {
+    "convex": "^1.17.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}
