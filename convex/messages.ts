@@ -1,4 +1,4 @@
-import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 
@@ -6,8 +6,8 @@ function parseRelativeTime(input: string): number | null {
   const match = input.match(/^(\d+)(m|h|d|w)$/);
   if (!match) return null;
 
-  const value = parseInt(match[1], 10);
-  const unit = match[2];
+  const value = parseInt(match[1]!, 10);
+  const unit = match[2]!;
   const now = Date.now();
 
   switch (unit) {
@@ -154,7 +154,7 @@ export const getMessage = query({
   },
 });
 
-export const search = internalQuery({
+export const search = query({
   args: {
     pattern: v.optional(v.string()),
     patternFlags: v.optional(v.string()),
@@ -260,7 +260,7 @@ export const search = internalQuery({
     const paginatedMessages = messages.slice(cursorIndex, cursorIndex + limit);
     const hasMore = cursorIndex + limit < messages.length;
     const nextCursor = hasMore && paginatedMessages.length > 0
-      ? paginatedMessages[paginatedMessages.length - 1]._id
+      ? paginatedMessages[paginatedMessages.length - 1]!._id
       : null;
 
     return {
@@ -365,7 +365,7 @@ async function searchWithContextDirection(
   return { messages: [], cursor: null, hasMore: false };
 }
 
-export const listUnread = internalQuery({
+export const listUnread = query({
   args: {
     channel: v.optional(v.string()),
     limit: v.optional(v.number()),
