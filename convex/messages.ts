@@ -1,4 +1,4 @@
-import { mutation, query, internalQuery } from "./_generated/server";
+import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 
@@ -25,6 +25,25 @@ function parseRelativeTime(input: string): number | null {
 }
 
 export const ingestMessage = mutation({
+  args: {
+    content: v.string(),
+    channel: v.string(),
+    tags: v.optional(v.array(v.string())),
+    metadata: v.optional(v.record(v.string(), v.any())),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("messages", {
+      content: args.content,
+      role: "user",
+      channel: args.channel,
+      read: false,
+      tags: args.tags ?? [],
+      metadata: args.metadata,
+    });
+  },
+});
+
+export const ingestMessageInternal = internalMutation({
   args: {
     content: v.string(),
     channel: v.string(),

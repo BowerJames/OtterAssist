@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 export const createAgent = mutation({
@@ -66,6 +66,15 @@ export const listAgents = query({
 });
 
 export const getAgent = query({
+  args: {
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.agentId);
+  },
+});
+
+export const getAgentInternal = internalQuery({
   args: {
     agentId: v.id("agents"),
   },
