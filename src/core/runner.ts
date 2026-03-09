@@ -1,6 +1,7 @@
 /**
  * Agent Runner - pi SDK integration for running AI agents
  * @see Issue #7
+ * @see Issue #23 (pi extension integration)
  */
 
 import { homedir } from "node:os";
@@ -10,6 +11,7 @@ import {
   createAgentSession,
   createCodingTools,
   DefaultResourceLoader,
+  type ExtensionFactory,
   ModelRegistry,
   SessionManager,
   SettingsManager,
@@ -51,7 +53,12 @@ Event Processing:
 - Update progress on events as you work to track what you've done
 - Only mark an event complete when it is fully resolved
 - If you cannot complete an event, leave it pending with progress notes explaining why
-- Events stay pending on failure, so be thorough and don't abandon work`;
+- Events stay pending on failure, so be thorough and don't abandon work
+
+Extension Skills:
+- Extensions may provide additional skills for handling specific event types
+- Check available skills when you encounter events that need specialized handling
+- Skills provide context and instructions for working with specific systems`;
 
 /**
  * Options for creating an AgentRunner
@@ -65,6 +72,12 @@ export interface AgentRunnerOptions {
   cwd?: string;
   /** Agent directory for extensions, skills, etc. (default: ~/.otterassist/agent) */
   agentDir?: string;
+  /**
+   * Pi extension factories from OtterAssist extensions.
+   * These are passed to the pi agent to register tools, skills, hooks, etc.
+   * @see Issue #23
+   */
+  piExtensionFactories?: ExtensionFactory[];
 }
 
 /**
@@ -88,19 +101,24 @@ export interface Runner {
 }
 
 /**
- * Agent runner that uses the pi SDK to process events
+ * Agent runner that uses the pi SDK to process events.
+ *
+ * Supports pi extension factories from OtterAssist extensions, allowing
+ * extensions to register tools, skills, and hooks with the embedded agent.
  */
 export class AgentRunner {
   private readonly eventQueue: EventQueue;
   private readonly logger: Logger;
   private readonly cwd: string;
   private readonly agentDir: string;
+  private readonly piExtensionFactories: ExtensionFactory[];
 
   constructor(options: AgentRunnerOptions) {
     this.eventQueue = options.eventQueue;
     this.logger = options.logger;
     this.cwd = options.cwd ?? process.cwd();
     this.agentDir = options.agentDir ?? DEFAULT_AGENT_DIR;
+    this.piExtensionFactories = options.piExtensionFactories ?? [];
   }
 
   /**
@@ -115,6 +133,12 @@ export class AgentRunner {
     }
 
     this.logger.info(`Starting agent run with ${events.length} event(s)`);
+
+    if (this.piExtensionFactories.length > 0) {
+      this.logger.info(
+        `Loading ${this.piExtensionFactories.length} pi extension(s)`,
+      );
+    }
 
     try {
       // Set up auth and model registry
@@ -131,11 +155,13 @@ export class AgentRunner {
       // Create coding tools with the correct cwd
       const codingTools = createCodingTools(this.cwd);
 
-      // Set up resource loader with custom agent directory
+      // Set up resource loader with custom agent directory and pi extensions
       const resourceLoader = new DefaultResourceLoader({
         cwd: this.cwd,
         agentDir: this.agentDir,
         systemPromptOverride: () => OTTERASSIST_SYSTEM_PROMPT,
+        // Pass OtterAssist extension's pi extension factories
+        extensionFactories: this.piExtensionFactories,
       });
       await resourceLoader.reload();
 
@@ -143,7 +169,7 @@ export class AgentRunner {
       const settingsManager = SettingsManager.inMemory();
 
       // Create the agent session
-      const { session } = await createAgentSession({
+      const { session, extensionsResult } = await createAgentSession({
         cwd: this.cwd,
         agentDir: this.agentDir,
         tools: codingTools,
@@ -154,6 +180,18 @@ export class AgentRunner {
         authStorage,
         modelRegistry,
       });
+
+      // Log extension loading results
+      if (extensionsResult.extensions.length > 0) {
+        this.logger.debug(
+          `Loaded ${extensionsResult.extensions.length} pi extension(s)`,
+        );
+      }
+      if (extensionsResult.errors.length > 0) {
+        for (const error of extensionsResult.errors) {
+          this.logger.warn(`Pi extension error: ${error.message}`);
+        }
+      }
 
       // Subscribe to events for logging
       session.subscribe((event) => {

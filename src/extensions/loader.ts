@@ -7,6 +7,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
+import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import type {
   EventSourceExtension,
   OtterAssistExtension,
@@ -42,8 +43,8 @@ export interface LoadedExtension {
     initialize?(config: unknown, context: unknown): Promise<void>;
     shutdown?(): Promise<void>;
   };
-  /** Pi extension function (may be undefined for event-only extensions) */
-  piExtension?: (pi: unknown) => void;
+  /** Pi extension factory (may be undefined for event-only extensions) */
+  piExtension?: ExtensionFactory;
   /** Whether this is a legacy-format extension */
   isLegacy: boolean;
 }

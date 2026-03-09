@@ -4,6 +4,7 @@
  * @see Issue #23 (enhanced extension system with pi integration)
  */
 
+import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { CONFIG_DIR } from "../config/loader.ts";
 import type { Config, Logger, OAExtensionContext } from "../types/index.ts";
 import {
@@ -24,8 +25,8 @@ export class ExtensionManager {
   /** All loaded extensions (indexed by name) */
   private readonly extensions: Map<string, LoadedExtension> = new Map();
 
-  /** Pi extension functions collected from all extensions */
-  private readonly piExtensions: ((pi: unknown) => void)[] = [];
+  /** Pi extension factories collected from all extensions */
+  private readonly piExtensions: ExtensionFactory[] = [];
 
   private readonly logger: Logger;
   private readonly config: Config;
@@ -179,14 +180,14 @@ export class ExtensionManager {
   }
 
   /**
-   * Gets all pi extension functions from loaded extensions.
+   * Gets all pi extension factories from loaded extensions.
    *
-   * These functions should be passed to the embedded pi agent
-   * during initialization to register tools, skills, hooks, etc.
+   * These factories should be passed to the AgentRunner to register
+   * tools, skills, hooks, etc. with the embedded pi agent.
    *
-   * @returns Array of pi extension functions
+   * @returns Array of pi extension factories
    */
-  getPiExtensions(): ((pi: unknown) => void)[] {
+  getPiExtensions(): ExtensionFactory[] {
     return [...this.piExtensions];
   }
 

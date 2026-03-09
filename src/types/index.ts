@@ -171,6 +171,11 @@ export interface EventSourceDefinition {
  * import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
  * ```
  *
+ * For proper type safety, import ExtensionFactory directly from pi:
+ * ```typescript
+ * import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
+ * ```
+ *
  * @see https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md
  */
 export type PiExtensionFunction = (pi: unknown) => void;

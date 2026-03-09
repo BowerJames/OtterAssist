@@ -246,10 +246,19 @@ async function initializeComponents(configPath?: string): Promise<Components> {
   const extensionManager = new ExtensionManager(config, logger);
   await extensionManager.loadAll();
 
-  // Initialize agent runner
+  // Get pi extension factories from loaded extensions
+  const piExtensionFactories = extensionManager.getPiExtensions();
+  if (piExtensionFactories.length > 0) {
+    logger.info(
+      `Passing ${piExtensionFactories.length} pi extension(s) to agent`,
+    );
+  }
+
+  // Initialize agent runner with pi extensions
   const agentRunner = new AgentRunner({
     eventQueue,
     logger,
+    piExtensionFactories,
   });
 
   // Initialize orchestrator
