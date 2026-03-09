@@ -4,13 +4,34 @@
  */
 
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import {
+  AgentRunner,
+  type Config,
+  ConsoleLogger,
   discoverExtensionInfo,
+  type EventQueue,
+  ExtensionManager,
   isFirstRun,
+  type Logger,
   loadConfig,
+  Orchestrator,
   runSetupWizard,
+  Scheduler,
+  SQLiteEventQueue,
 } from "../index.ts";
+
+/** Return type for initializeComponents */
+interface Components {
+  config: Config;
+  logger: Logger;
+  eventQueue: EventQueue;
+  extensionManager: ExtensionManager;
+  agentRunner: AgentRunner;
+  orchestrator: Orchestrator;
+  scheduler: Scheduler;
+}
 
 /**
  * CLI options parsed from command line arguments
@@ -175,10 +196,84 @@ async function showStatus(): Promise<void> {
  * Lists pending events
  */
 async function listEvents(): Promise<void> {
-  // This would require initializing the event queue
-  // For now, just show a placeholder
-  console.log("🦦 Pending Events:");
-  console.log("  (Event listing not yet implemented)");
+  const firstRun = await isFirstRun();
+
+  if (firstRun) {
+    console.log("🦦 OtterAssist is not configured.");
+    console.log("Run 'otterassist --setup' first.");
+    return;
+  }
+
+  const logger = new ConsoleLogger("info");
+  const dbPath = join(homedir(), ".otterassist", "events.db");
+  const eventQueue = await SQLiteEventQueue.create(dbPath, logger);
+
+  try {
+    const events = await eventQueue.getPending();
+
+    if (events.length === 0) {
+      console.log("🦦 No pending events");
+      return;
+    }
+
+    console.log(`🦦 Pending Events (${events.length}):`);
+    for (const event of events) {
+      const created = event.createdAt.toLocaleString();
+      const progress = event.progress ? ` - ${event.progress}` : "";
+      console.log(`  • [${event.id.slice(0, 8)}...] ${event.message}`);
+      console.log(`    Created: ${created}${progress}`);
+    }
+  } finally {
+    eventQueue.close();
+  }
+}
+
+/**
+ * Initializes all components needed for the scheduler
+ */
+async function initializeComponents(): Promise<Components> {
+  const config = await loadConfig();
+  const logger = new ConsoleLogger("info");
+
+  // Initialize event queue
+  const dbPath = join(homedir(), ".otterassist", "events.db");
+  const eventQueue = await SQLiteEventQueue.create(dbPath, logger);
+
+  // Initialize extension manager
+  const extensionManager = new ExtensionManager(config, logger);
+  await extensionManager.loadAll();
+
+  // Initialize agent runner
+  const agentRunner = new AgentRunner({
+    eventQueue,
+    logger,
+  });
+
+  // Initialize orchestrator
+  const orchestrator = new Orchestrator({
+    eventQueue,
+    agentRunner,
+    logger,
+  });
+
+  // Initialize scheduler
+  const scheduler = new Scheduler({
+    pollIntervalSeconds: config.pollIntervalSeconds,
+    extensionManager,
+    eventQueue,
+    orchestrator,
+    logger,
+  });
+
+  return {
+    config,
+    logger,
+    eventQueue,
+    extensionManager,
+    agentRunner,
+    orchestrator,
+    scheduler,
+  };
 }
 
 /**
@@ -194,7 +289,73 @@ async function runOnce(): Promise<void> {
   }
 
   console.log("🦦 Running single check...");
-  console.log("  (Single check not yet implemented)");
+
+  let components: Components | undefined;
+  try {
+    components = await initializeComponents();
+    await components.scheduler.triggerNow();
+    console.log("✅ Single check completed");
+  } catch (error) {
+    console.error("❌ Single check failed:", error);
+    process.exit(1);
+  } finally {
+    if (components) {
+      await components.extensionManager.shutdownAll();
+      components.eventQueue.close();
+    }
+  }
+}
+
+/**
+ * Runs the daemon
+ */
+async function runDaemon(): Promise<void> {
+  const firstRun = await isFirstRun();
+
+  if (firstRun) {
+    console.log("🦦 Welcome to OtterAssist!");
+    console.log("Run 'otterassist --setup' to get started.");
+    process.exit(0);
+  }
+
+  let components: Components | undefined;
+  try {
+    components = await initializeComponents();
+    const { config, scheduler, extensionManager, eventQueue } = components;
+
+    console.log("🦦 OtterAssist daemon starting...");
+    console.log(`  Poll interval: ${config.pollIntervalSeconds}s`);
+    console.log(
+      `  Extensions: ${extensionManager.getLoadedNames().join(", ") || "none"}`,
+    );
+    console.log("");
+    console.log("Press Ctrl+C to stop.");
+
+    // Handle graceful shutdown
+    let isShuttingDown = false;
+    const shutdown = async () => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
+      console.log("\n🦦 Shutting down...");
+      await scheduler.stop();
+      await extensionManager.shutdownAll();
+      eventQueue.close();
+      console.log("🦦 Goodbye!");
+      process.exit(0);
+    };
+
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+
+    // Start the scheduler
+    scheduler.start();
+
+    // Keep the process alive
+    await new Promise(() => {}); // Never resolves
+  } catch (error) {
+    console.error("❌ Daemon failed to start:", error);
+    process.exit(1);
+  }
 }
 
 /**
@@ -239,16 +400,6 @@ export async function runCli(): Promise<void> {
     process.exit(0);
   }
 
-  // Default: start daemon (not yet implemented)
-  const firstRun = await isFirstRun();
-
-  if (firstRun) {
-    console.log("🦦 Welcome to OtterAssist!");
-    console.log("Run 'otterassist --setup' to get started.");
-    process.exit(0);
-  }
-
-  console.log("🦦 OtterAssist daemon starting...");
-  console.log("  (Daemon mode not yet implemented)");
-  console.log("Run 'otterassist --help' for usage information.");
+  // Default: start daemon
+  await runDaemon();
 }
