@@ -85,15 +85,15 @@ export default {
 });
 
 describe("loadExtension", () => {
-  it("should load a valid extension module", async () => {
+  it("should load a valid legacy extension module", async () => {
     // Create a temporary extension file
-    const tempPath = join(TEST_DIR, "valid-extension.ts");
+    const tempPath = join(TEST_DIR, "valid-legacy-extension.ts");
     await mkdir(TEST_DIR, { recursive: true });
 
     const extensionContent = `
 export default {
-  name: "valid-extension",
-  description: "A valid test extension",
+  name: "valid-legacy-extension",
+  description: "A valid legacy test extension",
   configSchema: {
     type: "object",
     properties: {
@@ -116,15 +116,119 @@ export default {
 
     const extension = await loadExtension(tempPath);
 
-    expect(extension.name).toBe("valid-extension");
-    expect(extension.description).toBe("A valid test extension");
-    expect(typeof extension.poll).toBe("function");
-    expect(typeof extension.initialize).toBe("function");
-    expect(typeof extension.shutdown).toBe("function");
+    expect(extension.name).toBe("valid-legacy-extension");
+    expect(extension.description).toBe("A valid legacy test extension");
+    expect(extension.isLegacy).toBe(true);
+    expect(extension.events).toBeDefined();
+    expect(typeof extension.events?.poll).toBe("function");
+    expect(typeof extension.events?.initialize).toBe("function");
+    expect(typeof extension.events?.shutdown).toBe("function");
+    expect(extension.piExtension).toBeUndefined();
 
     // Test poll works
-    const messages = await extension.poll();
+    const messages = await extension.events!.poll();
     expect(messages).toEqual(["event1", "event2"]);
+
+    await cleanupTestDir();
+  });
+
+  it("should load a valid new-format extension with events only", async () => {
+    const tempPath = join(TEST_DIR, "new-events-only.ts");
+    await mkdir(TEST_DIR, { recursive: true });
+
+    const extensionContent = `
+export default {
+  name: "new-events-only",
+  description: "New format with events only",
+  version: "1.0.0",
+  events: {
+    async initialize(config, context) {
+      context.logger.info("Initialized");
+    },
+    async poll() {
+      return ["new-event"];
+    },
+    async shutdown() {
+      console.log("Shutdown");
+    }
+  }
+};
+`;
+    await writeFile(tempPath, extensionContent);
+
+    const extension = await loadExtension(tempPath);
+
+    expect(extension.name).toBe("new-events-only");
+    expect(extension.description).toBe("New format with events only");
+    expect(extension.version).toBe("1.0.0");
+    expect(extension.isLegacy).toBe(false);
+    expect(extension.events).toBeDefined();
+    expect(extension.piExtension).toBeUndefined();
+
+    const messages = await extension.events!.poll();
+    expect(messages).toEqual(["new-event"]);
+
+    await cleanupTestDir();
+  });
+
+  it("should load a valid new-format extension with pi extension only", async () => {
+    const tempPath = join(TEST_DIR, "new-pi-only.ts");
+    await mkdir(TEST_DIR, { recursive: true });
+
+    const extensionContent = `
+export default {
+  name: "new-pi-only",
+  description: "New format with pi extension only",
+  version: "2.0.0",
+  piExtension(pi) {
+    console.log("Pi extension registered", pi);
+  }
+};
+`;
+    await writeFile(tempPath, extensionContent);
+
+    const extension = await loadExtension(tempPath);
+
+    expect(extension.name).toBe("new-pi-only");
+    expect(extension.description).toBe("New format with pi extension only");
+    expect(extension.version).toBe("2.0.0");
+    expect(extension.isLegacy).toBe(false);
+    expect(extension.events).toBeUndefined();
+    expect(extension.piExtension).toBeDefined();
+    expect(typeof extension.piExtension).toBe("function");
+
+    await cleanupTestDir();
+  });
+
+  it("should load a valid new-format extension with both events and pi", async () => {
+    const tempPath = join(TEST_DIR, "new-full.ts");
+    await mkdir(TEST_DIR, { recursive: true });
+
+    const extensionContent = `
+export default {
+  name: "new-full",
+  description: "New format with both events and pi",
+  events: {
+    async poll() {
+      return ["full-event"];
+    }
+  },
+  piExtension(pi) {
+    console.log("Full extension pi registered");
+  }
+};
+`;
+    await writeFile(tempPath, extensionContent);
+
+    const extension = await loadExtension(tempPath);
+
+    expect(extension.name).toBe("new-full");
+    expect(extension.isLegacy).toBe(false);
+    expect(extension.events).toBeDefined();
+    expect(extension.piExtension).toBeDefined();
+
+    const messages = await extension.events!.poll();
+    expect(messages).toEqual(["full-event"]);
 
     await cleanupTestDir();
   });
@@ -144,7 +248,7 @@ export default {
     await writeFile(tempPath, extensionContent);
 
     await expect(loadExtension(tempPath)).rejects.toThrow(
-      "does not export a valid EventSourceExtension",
+      "does not export a valid extension",
     );
 
     await cleanupTestDir();
@@ -165,26 +269,48 @@ export default {
     await writeFile(tempPath, extensionContent);
 
     await expect(loadExtension(tempPath)).rejects.toThrow(
-      "does not export a valid EventSourceExtension",
+      "does not export a valid extension",
     );
 
     await cleanupTestDir();
   });
 
-  it("should throw for invalid extension (missing poll)", async () => {
+  it("should throw for invalid extension (no events or piExtension)", async () => {
+    const tempPath = join(TEST_DIR, "invalid-empty.ts");
+    await mkdir(TEST_DIR, { recursive: true });
+
+    const extensionContent = `
+export default {
+  name: "empty-extension",
+  description: "Has neither events nor piExtension"
+};
+`;
+    await writeFile(tempPath, extensionContent);
+
+    await expect(loadExtension(tempPath)).rejects.toThrow(
+      "does not export a valid extension",
+    );
+
+    await cleanupTestDir();
+  });
+
+  it("should throw for invalid extension (missing poll in events)", async () => {
     const tempPath = join(TEST_DIR, "invalid-no-poll.ts");
     await mkdir(TEST_DIR, { recursive: true });
 
     const extensionContent = `
 export default {
   name: "no-poll",
-  description: "Missing poll function"
+  description: "Missing poll in events",
+  events: {
+    initialize() {}
+  }
 };
 `;
     await writeFile(tempPath, extensionContent);
 
     await expect(loadExtension(tempPath)).rejects.toThrow(
-      "does not export a valid EventSourceExtension",
+      "does not export a valid extension",
     );
 
     await cleanupTestDir();

@@ -1,23 +1,33 @@
 /**
- * Extension manager - handles lifecycle of event source extensions
- * @see Issue #4
+ * Extension manager - handles lifecycle of OtterAssist extensions
+ * @see Issue #4 (original event source extensions)
+ * @see Issue #23 (enhanced extension system with pi integration)
  */
 
+import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { CONFIG_DIR } from "../config/loader.ts";
-import { SimpleEventEmitter } from "../core/emitter.ts";
-import type {
-  Config,
-  EventSourceExtension,
-  ExtensionContext,
-  Logger,
-} from "../types/index.ts";
-import { discoverExtensions, loadExtension } from "./loader.ts";
+import type { Config, Logger, OAExtensionContext } from "../types/index.ts";
+import {
+  type LoadedExtension,
+  discoverExtensions,
+  loadExtension,
+} from "./loader.ts";
 
 /**
- * Manages the lifecycle of event source extensions
+ * Manages the lifecycle of OtterAssist extensions.
+ *
+ * Handles:
+ * - Discovery and loading of extensions from disk
+ * - Lifecycle management (initialize, poll, shutdown)
+ * - Separation of event sources and pi extensions
  */
 export class ExtensionManager {
-  private readonly extensions: Map<string, EventSourceExtension> = new Map();
+  /** All loaded extensions (indexed by name) */
+  private readonly extensions: Map<string, LoadedExtension> = new Map();
+
+  /** Pi extension factories collected from all extensions */
+  private readonly piExtensions: ExtensionFactory[] = [];
+
   private readonly logger: Logger;
   private readonly config: Config;
 
@@ -27,7 +37,12 @@ export class ExtensionManager {
   }
 
   /**
-   * Discovers, loads, filters, and initializes all extensions
+   * Discovers, loads, filters, and initializes all extensions.
+   *
+   * For each enabled extension:
+   * 1. Loads the extension module
+   * 2. Initializes the event source (if present)
+   * 3. Collects pi extension function (if present)
    */
   async loadAll(): Promise<void> {
     this.logger.info("Discovering extensions...");
@@ -49,40 +64,70 @@ export class ExtensionManager {
           continue;
         }
 
-        // Initialize the extension if it has an initialize method
-        if (extension.initialize) {
-          const context: ExtensionContext = {
+        // Log format warning for legacy extensions
+        if (extension.isLegacy) {
+          this.logger.debug(
+            `Extension "${extensionName}" uses legacy format. ` +
+              "Consider upgrading to OtterAssistExtension for pi integration.",
+          );
+        }
+
+        // Initialize the event source if present
+        if (extension.events?.initialize) {
+          const context: OAExtensionContext = {
             configDir: CONFIG_DIR,
             logger: this.createExtensionLogger(extensionName),
-            events: new SimpleEventEmitter(),
           };
 
           const config = extensionConfig.config ?? extension.defaultConfig;
-          await extension.initialize(config, context);
+          await extension.events.initialize(config, context);
         }
 
+        // Store the extension
         this.extensions.set(extensionName, extension);
+
+        // Collect pi extension function if present
+        if (extension.piExtension) {
+          this.piExtensions.push(extension.piExtension);
+          this.logger.debug(
+            `Extension "${extensionName}" registered pi extension`,
+          );
+        }
+
+        // Log loaded extension
+        const hasEvents = extension.events ? "events" : "";
+        const hasPi = extension.piExtension ? "pi" : "";
+        const capabilities = [hasEvents, hasPi].filter(Boolean).join("+");
+        const version = extension.version ? ` v${extension.version}` : "";
+
         this.logger.info(
-          `Loaded extension: ${extensionName} - ${extension.description}`,
+          `Loaded extension: ${extensionName}${version} - ${extension.description} [${capabilities || "empty"}]`,
         );
       } catch (error) {
         this.logger.error(`Failed to load extension from ${path}:`, error);
       }
     }
 
-    this.logger.info(`Loaded ${this.extensions.size} extension(s)`);
+    this.logger.info(
+      `Loaded ${this.extensions.size} extension(s), ${this.piExtensions.length} with pi integration`,
+    );
   }
 
   /**
-   * Polls all enabled extensions and returns collected messages
+   * Polls all extensions with event sources and returns collected messages.
    */
   async pollAll(): Promise<string[]> {
     const messages: string[] = [];
 
     for (const [name, extension] of this.extensions) {
+      // Skip extensions without event sources
+      if (!extension.events) {
+        continue;
+      }
+
       try {
         this.logger.debug(`Polling extension: ${name}`);
-        const newMessages = await extension.poll();
+        const newMessages = await extension.events.poll();
 
         if (newMessages.length > 0) {
           this.logger.info(
@@ -99,15 +144,15 @@ export class ExtensionManager {
   }
 
   /**
-   * Shuts down all extensions
+   * Shuts down all extensions with event sources.
    */
   async shutdownAll(): Promise<void> {
     this.logger.info("Shutting down extensions...");
 
     for (const [name, extension] of this.extensions) {
-      if (extension.shutdown) {
+      if (extension.events?.shutdown) {
         try {
-          await extension.shutdown();
+          await extension.events.shutdown();
           this.logger.debug(`Extension "${name}" shut down`);
         } catch (error) {
           this.logger.error(`Error shutting down extension "${name}":`, error);
@@ -116,25 +161,45 @@ export class ExtensionManager {
     }
 
     this.extensions.clear();
+    this.piExtensions.length = 0;
     this.logger.info("All extensions shut down");
   }
 
   /**
-   * Gets a loaded extension by name
+   * Gets a loaded extension by name.
    */
-  get(name: string): EventSourceExtension | undefined {
+  get(name: string): LoadedExtension | undefined {
     return this.extensions.get(name);
   }
 
   /**
-   * Gets all loaded extension names
+   * Gets all loaded extension names.
    */
   getLoadedNames(): string[] {
     return [...this.extensions.keys()];
   }
 
   /**
-   * Creates a prefixed logger for an extension
+   * Gets all pi extension factories from loaded extensions.
+   *
+   * These factories should be passed to the AgentRunner to register
+   * tools, skills, hooks, etc. with the embedded pi agent.
+   *
+   * @returns Array of pi extension factories
+   */
+  getPiExtensions(): ExtensionFactory[] {
+    return [...this.piExtensions];
+  }
+
+  /**
+   * Checks if any extensions have pi integration.
+   */
+  hasPiExtensions(): boolean {
+    return this.piExtensions.length > 0;
+  }
+
+  /**
+   * Creates a prefixed logger for an extension.
    */
   private createExtensionLogger(name: string): Logger {
     const parent = this.logger;

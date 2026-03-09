@@ -40,7 +40,19 @@ export {
 export {
   discoverExtensions,
   ExtensionManager,
+  GLOBAL_EXTENSIONS_DIR,
+  type LoadedExtension,
   loadExtension,
+  LOCAL_EXTENSIONS_DIR,
+} from "./extensions/index.ts";
+export type {
+  EventSourceDefinition,
+  EventSourceExtension,
+  ExtensionContext,
+  ExtensionFactory,
+  OAExtensionContext,
+  OtterAssistExtension,
+  PiExtensionFunction,
 } from "./extensions/index.ts";
 // Re-export setup wizard
 export {
