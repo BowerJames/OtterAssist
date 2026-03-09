@@ -13,13 +13,19 @@ export { defaultConfig, validateConfig } from "./config/schema.ts";
 export { SimpleEventEmitter } from "./core/emitter.ts";
 // Re-export core components
 export { ConsoleLogger, logger } from "./core/logger.ts";
-export { Orchestrator } from "./core/orchestrator.ts";
+export {
+  Orchestrator,
+  type OrchestratorOptions,
+  type OrchestratorRunResult,
+  type OrchestratorStatus,
+} from "./core/orchestrator.ts";
 export { SQLiteEventQueue } from "./core/queue.ts";
 export {
   AgentRunner,
   type AgentRunnerOptions,
   type AgentRunResult,
   DEFAULT_AGENT_DIR,
+  type Runner,
 } from "./core/runner.ts";
 export { Scheduler } from "./core/scheduler.ts";
 

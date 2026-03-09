@@ -80,6 +80,14 @@ export interface AgentRunResult {
 }
 
 /**
+ * Interface for running agents - allows for easy mocking in tests
+ */
+export interface Runner {
+  /** Runs the agent to process pending events */
+  run(events: Event[]): Promise<AgentRunResult>;
+}
+
+/**
  * Agent runner that uses the pi SDK to process events
  */
 export class AgentRunner {
