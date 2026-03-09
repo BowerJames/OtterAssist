@@ -18,8 +18,12 @@ export { SQLiteEventQueue } from "./core/queue.ts";
 export { AgentRunner } from "./core/runner.ts";
 export { Scheduler } from "./core/scheduler.ts";
 
-// Re-export extension utilities
-export { discoverExtensions, loadExtension } from "./extensions/loader.ts";
+// Re-export extension system
+export {
+  discoverExtensions,
+  ExtensionManager,
+  loadExtension,
+} from "./extensions/index.ts";
 // Re-export types
 export * from "./types/index.ts";
 
