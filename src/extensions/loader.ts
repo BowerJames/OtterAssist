@@ -1,12 +1,16 @@
 /**
- * Extension loader - discovers and loads event source extensions
- * @see Issue #4
+ * Extension loader - discovers and loads OtterAssist extensions
+ * @see Issue #4 (original event source extensions)
+ * @see Issue #23 (enhanced extension system with pi integration)
  */
 
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { EventSourceExtension } from "../types/index.ts";
+import type {
+  EventSourceExtension,
+  OtterAssistExtension,
+} from "../types/index.ts";
 
 /** Global extension directory */
 export const GLOBAL_EXTENSIONS_DIR = join(
@@ -21,6 +25,28 @@ export const LOCAL_EXTENSIONS_DIR = join(
   ".otterassist",
   "extensions",
 );
+
+/**
+ * Internal representation of a loaded extension.
+ * Normalizes both legacy and new formats for consistent handling.
+ */
+export interface LoadedExtension {
+  name: string;
+  description: string;
+  version?: string;
+  configSchema?: Record<string, unknown>;
+  defaultConfig?: unknown;
+  /** Event source definition (may be undefined for pi-only extensions) */
+  events?: {
+    poll(): Promise<string[]>;
+    initialize?(config: unknown, context: unknown): Promise<void>;
+    shutdown?(): Promise<void>;
+  };
+  /** Pi extension function (may be undefined for event-only extensions) */
+  piExtension?: (pi: unknown) => void;
+  /** Whether this is a legacy-format extension */
+  isLegacy: boolean;
+}
 
 /**
  * Discovers extensions from global and project-local directories
@@ -76,13 +102,15 @@ async function scanDirectory(
 }
 
 /**
- * Validates that an object is a valid EventSourceExtension
+ * Validates that an object is a valid legacy EventSourceExtension
+ * @deprecated New extensions should use OtterAssistExtension format
  */
-function isValidExtension(obj: unknown): obj is EventSourceExtension {
+function isValidLegacyExtension(obj: unknown): obj is EventSourceExtension {
   if (!obj || typeof obj !== "object") return false;
 
   const ext = obj as Record<string, unknown>;
 
+  // Legacy format requires poll() at the top level
   return (
     typeof ext.name === "string" &&
     typeof ext.description === "string" &&
@@ -95,12 +123,78 @@ function isValidExtension(obj: unknown): obj is EventSourceExtension {
 }
 
 /**
- * Loads an extension module
- * Validates that the module exports a valid EventSourceExtension
+ * Validates that an object is a valid new-format OtterAssistExtension
+ */
+function isValidNewExtension(obj: unknown): obj is OtterAssistExtension {
+  if (!obj || typeof obj !== "object") return false;
+
+  const ext = obj as Record<string, unknown>;
+
+  // Must have name and description
+  if (typeof ext.name !== "string" || typeof ext.description !== "string") {
+    return false;
+  }
+
+  // Must have at least events or piExtension
+  const hasEvents = ext.events !== undefined;
+  const hasPiExtension = ext.piExtension !== undefined;
+
+  if (!hasEvents && !hasPiExtension) {
+    return false;
+  }
+
+  // Validate events structure if present
+  if (hasEvents) {
+    const events = ext.events as Record<string, unknown>;
+    if (typeof events.poll !== "function") {
+      return false;
+    }
+    if (
+      events.initialize !== undefined &&
+      typeof events.initialize !== "function"
+    ) {
+      return false;
+    }
+    if (
+      events.shutdown !== undefined &&
+      typeof events.shutdown !== "function"
+    ) {
+      return false;
+    }
+  }
+
+  // Validate piExtension if present
+  if (hasPiExtension && typeof ext.piExtension !== "function") {
+    return false;
+  }
+
+  // Optional fields validation
+  if (ext.version !== undefined && typeof ext.version !== "string") {
+    return false;
+  }
+  if (
+    ext.configSchema !== undefined &&
+    typeof ext.configSchema !== "object"
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Loads an extension module and normalizes it to LoadedExtension format.
+ *
+ * Supports both formats:
+ * - Legacy EventSourceExtension (poll at top level)
+ * - New OtterAssistExtension (events.poll + optional piExtension)
+ *
+ * @param extensionPath - Path to the extension module
+ * @returns Normalized LoadedExtension object
  */
 export async function loadExtension(
   extensionPath: string,
-): Promise<EventSourceExtension> {
+): Promise<LoadedExtension> {
   try {
     // Bun can import TypeScript directly
     const module = await import(extensionPath);
@@ -108,14 +202,49 @@ export async function loadExtension(
     // Support both default export and named export
     const extension = module.default ?? module.extension ?? module;
 
-    if (!isValidExtension(extension)) {
-      throw new Error(
-        `Module ${extensionPath} does not export a valid EventSourceExtension. ` +
-          "Expected object with: name (string), description (string), poll (function)",
-      );
+    // Try new format first
+    if (isValidNewExtension(extension)) {
+      return {
+        name: extension.name,
+        description: extension.description,
+        version: extension.version,
+        configSchema: extension.configSchema,
+        defaultConfig: extension.defaultConfig,
+        events: extension.events
+          ? {
+              poll: extension.events.poll.bind(extension.events),
+              initialize: extension.events.initialize?.bind(extension.events),
+              shutdown: extension.events.shutdown?.bind(extension.events),
+            }
+          : undefined,
+        piExtension: extension.piExtension,
+        isLegacy: false,
+      };
     }
 
-    return extension;
+    // Fall back to legacy format
+    if (isValidLegacyExtension(extension)) {
+      return {
+        name: extension.name,
+        description: extension.description,
+        configSchema: extension.configSchema,
+        defaultConfig: extension.defaultConfig,
+        events: {
+          poll: extension.poll.bind(extension),
+          initialize: extension.initialize?.bind(extension),
+          shutdown: extension.shutdown?.bind(extension),
+        },
+        piExtension: undefined,
+        isLegacy: true,
+      };
+    }
+
+    // Neither format matched
+    throw new Error(
+      `Module ${extensionPath} does not export a valid extension. ` +
+        "Expected OtterAssistExtension (name, description, events?, piExtension?) " +
+        "or legacy EventSourceExtension (name, description, poll).",
+    );
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(

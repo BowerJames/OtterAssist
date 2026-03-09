@@ -56,6 +56,8 @@ describe("ExtensionManager", () => {
     const manager = new ExtensionManager(testConfig, logger);
 
     expect(manager.getLoadedNames()).toEqual([]);
+    expect(manager.hasPiExtensions()).toBe(false);
+    expect(manager.getPiExtensions()).toEqual([]);
   });
 
   it("should poll all extensions and collect messages", async () => {
@@ -69,8 +71,10 @@ describe("ExtensionManager", () => {
 export default {
   name: "enabled-extension",
   description: "Test extension for polling",
-  async poll() {
-    return ["message1", "message2"];
+  events: {
+    async poll() {
+      return ["message1", "message2"];
+    }
   }
 };
 `;
@@ -78,9 +82,12 @@ export default {
 
     // Load the extension directly
     const { loadExtension } = await import("./loader.ts");
-    const _ext = await loadExtension(extensionPath);
+    const ext = await loadExtension(extensionPath);
 
-    // Manually add to manager (since loadAll uses real directories)
+    // Verify the extension loaded correctly
+    expect(ext.name).toBe("enabled-extension");
+    expect(ext.events).toBeDefined();
+
     // For this test, we'll just verify pollAll works with no extensions
     const messages = await manager.pollAll();
     expect(messages).toEqual([]);
@@ -110,20 +117,16 @@ export default {
     await createTestDir();
     const extensionPath = join(TEST_DIR, "logger-test.ts");
     const extensionContent = `
-let contextLogger = null;
-
 export default {
   name: "enabled-extension",
   description: "Test extension with logger",
-  async initialize(config, context) {
-    contextLogger = context.logger;
-    context.logger.info("Initialization message");
-  },
-  async poll() {
-    if (contextLogger) {
-      contextLogger.debug("Poll message");
+  events: {
+    async initialize(config, context) {
+      context.logger.info("Initialization message");
+    },
+    async poll() {
+      return [];
     }
-    return [];
   }
 };
 `;
@@ -132,5 +135,56 @@ export default {
     // The manager's internal createExtensionLogger works
     // We can verify by checking the manager doesn't throw
     expect(manager).toBeDefined();
+  });
+
+  it("should detect pi extensions", async () => {
+    await createTestDir();
+
+    // Create extension with pi extension
+    const piExtPath = join(TEST_DIR, "pi-extension.ts");
+    const piExtContent = `
+export default {
+  name: "pi-extension",
+  description: "Extension with pi integration",
+  piExtension(pi) {
+    console.log("Registered with pi", pi);
+  }
+};
+`;
+    await writeFile(piExtPath, piExtContent);
+
+    const { loadExtension } = await import("./loader.ts");
+    const ext = await loadExtension(piExtPath);
+
+    expect(ext.piExtension).toBeDefined();
+    expect(ext.events).toBeUndefined();
+  });
+
+  it("should support extensions with both events and pi", async () => {
+    await createTestDir();
+
+    const fullPath = join(TEST_DIR, "full-extension.ts");
+    const content = `
+export default {
+  name: "full-extension",
+  description: "Full extension",
+  events: {
+    async poll() {
+      return ["event"];
+    }
+  },
+  piExtension(pi) {
+    console.log("Pi registered");
+  }
+};
+`;
+    await writeFile(fullPath, content);
+
+    const { loadExtension } = await import("./loader.ts");
+    const ext = await loadExtension(fullPath);
+
+    expect(ext.events).toBeDefined();
+    expect(ext.piExtension).toBeDefined();
+    expect(ext.isLegacy).toBe(false);
   });
 });
