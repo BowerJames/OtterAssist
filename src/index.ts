@@ -49,6 +49,7 @@ export type {
   EventSourceDefinition,
   EventSourceExtension,
   ExtensionContext,
+  ExtensionFactory,
   OAExtensionContext,
   OtterAssistExtension,
   PiExtensionFunction,

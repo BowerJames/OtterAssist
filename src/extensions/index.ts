@@ -14,6 +14,9 @@ export type {
   ExtensionContext,
 } from "../types/index.ts";
 
+// Re-export ExtensionFactory from pi for extension authors
+export type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
+
 // Re-export loader
 export {
   type LoadedExtension,
