@@ -15,8 +15,20 @@ export { SimpleEventEmitter } from "./core/emitter.ts";
 export { ConsoleLogger, logger } from "./core/logger.ts";
 export { Orchestrator } from "./core/orchestrator.ts";
 export { SQLiteEventQueue } from "./core/queue.ts";
-export { AgentRunner } from "./core/runner.ts";
+export {
+  AgentRunner,
+  type AgentRunnerOptions,
+  type AgentRunResult,
+  DEFAULT_AGENT_DIR,
+} from "./core/runner.ts";
 export { Scheduler } from "./core/scheduler.ts";
+
+// Re-export event management tools
+export {
+  createCompleteEventTool,
+  createListEventsTool,
+  createUpdateEventProgressTool,
+} from "./core/tools/index.ts";
 
 // Re-export extension system
 export {
