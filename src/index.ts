@@ -42,13 +42,28 @@ export {
   ExtensionManager,
   loadExtension,
 } from "./extensions/index.ts";
+// Re-export setup wizard
+export {
+  defaultTheme,
+  discoverExtensionInfo,
+  type ExtensionInfo,
+  isFirstRun,
+  runSetupIfNeeded,
+  runSetupWizard,
+  type ScreenComponent,
+  type ScreenFactory,
+  type ScreenResult,
+  SetupWizard,
+  type WizardState,
+  type WizardTheme,
+} from "./setup/index.ts";
 // Re-export types
 export * from "./types/index.ts";
 
 // Main entry point
 async function main(): Promise<void> {
-  console.log("🦦 OtterAssist - AI Agent for your computer");
-  console.log("Run 'otterassist --help' for usage information");
+  const { runCli } = await import("./cli/index.ts");
+  await runCli();
 }
 
 // Run main if this is the entry point
