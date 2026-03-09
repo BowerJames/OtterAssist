@@ -237,9 +237,11 @@ export async function runSetupWizard(
 
 /**
  * Check if this is first run (no config exists)
+ * @param configPath - Optional custom config file path
  */
-export async function isFirstRun(): Promise<boolean> {
-  const file = Bun.file(CONFIG_PATH);
+export async function isFirstRun(configPath?: string): Promise<boolean> {
+  const filePath = configPath ?? CONFIG_PATH;
+  const file = Bun.file(filePath);
   return !(await file.exists());
 }
 

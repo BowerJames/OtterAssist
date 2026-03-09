@@ -81,4 +81,5 @@ export interface EventQueue {
   updateProgress(id: string, progress: string): Promise<void>;
   markComplete(id: string): Promise<void>;
   purgeCompleted(olderThan: Date): Promise<number>;
+  close(): void;
 }

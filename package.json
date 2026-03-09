@@ -5,10 +5,13 @@
   "module": "src/index.ts",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "bin": {
+    "otterassist": "./dist/index.js"
+  },
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --outdir=dist --target=node",
+    "build": "bun build src/index.ts --outdir=dist --target=node --shebang",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "lint": "biome check src/",
