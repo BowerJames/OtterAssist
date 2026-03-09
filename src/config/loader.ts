@@ -46,13 +46,15 @@ function deepMerge<T extends Record<string, unknown>>(
 }
 
 /**
- * Loads configuration from ~/.otterassist/config.json
+ * Loads configuration from ~/.otterassist/config.json or a custom path
  * Returns default config if file doesn't exist
  * Merges with defaults for partial configs
+ * @param configPath - Optional custom config file path
  */
-export async function loadConfig(): Promise<Config> {
+export async function loadConfig(configPath?: string): Promise<Config> {
+  const filePath = configPath ?? CONFIG_PATH;
   try {
-    const file = Bun.file(CONFIG_PATH);
+    const file = Bun.file(filePath);
     const exists = await file.exists();
 
     if (!exists) {
@@ -70,7 +72,7 @@ export async function loadConfig(): Promise<Config> {
 
     if (!validateConfig(merged)) {
       throw new Error(
-        `Invalid configuration in ${CONFIG_PATH}. Check that pollIntervalSeconds is a positive number and extensions have proper structure.`,
+        `Invalid configuration in ${filePath}. Check that pollIntervalSeconds is a positive number and extensions have proper structure.`,
       );
     }
 
@@ -78,7 +80,7 @@ export async function loadConfig(): Promise<Config> {
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(
-        `Failed to parse config file ${CONFIG_PATH}: ${error.message}`,
+        `Failed to parse config file ${filePath}: ${error.message}`,
       );
     }
     throw error;

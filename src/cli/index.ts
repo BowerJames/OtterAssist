@@ -174,8 +174,8 @@ async function runSetup(): Promise<void> {
 /**
  * Shows current status
  */
-async function showStatus(): Promise<void> {
-  const firstRun = await isFirstRun();
+async function showStatus(configPath?: string): Promise<void> {
+  const firstRun = await isFirstRun(configPath);
 
   if (firstRun) {
     console.log("🦦 OtterAssist Status: Not configured");
@@ -183,8 +183,11 @@ async function showStatus(): Promise<void> {
     return;
   }
 
-  const config = await loadConfig();
+  const config = await loadConfig(configPath);
   console.log("🦦 OtterAssist Status");
+  if (configPath) {
+    console.log(`  Config: ${configPath}`);
+  }
   console.log(`  Poll interval: ${config.pollIntervalSeconds}s`);
   console.log("  Extensions:");
   for (const [name, { enabled }] of Object.entries(config.extensions)) {
@@ -195,8 +198,8 @@ async function showStatus(): Promise<void> {
 /**
  * Lists pending events
  */
-async function listEvents(): Promise<void> {
-  const firstRun = await isFirstRun();
+async function listEvents(configPath?: string): Promise<void> {
+  const firstRun = await isFirstRun(configPath);
 
   if (firstRun) {
     console.log("🦦 OtterAssist is not configured.");
@@ -231,8 +234,8 @@ async function listEvents(): Promise<void> {
 /**
  * Initializes all components needed for the scheduler
  */
-async function initializeComponents(): Promise<Components> {
-  const config = await loadConfig();
+async function initializeComponents(configPath?: string): Promise<Components> {
+  const config = await loadConfig(configPath);
   const logger = new ConsoleLogger("info");
 
   // Initialize event queue
@@ -279,8 +282,8 @@ async function initializeComponents(): Promise<Components> {
 /**
  * Runs a single check
  */
-async function runOnce(): Promise<void> {
-  const firstRun = await isFirstRun();
+async function runOnce(configPath?: string): Promise<void> {
+  const firstRun = await isFirstRun(configPath);
 
   if (firstRun) {
     console.log("🦦 OtterAssist is not configured.");
@@ -292,7 +295,7 @@ async function runOnce(): Promise<void> {
 
   let components: Components | undefined;
   try {
-    components = await initializeComponents();
+    components = await initializeComponents(configPath);
     await components.scheduler.triggerNow();
     console.log("✅ Single check completed");
   } catch (error) {
@@ -309,8 +312,8 @@ async function runOnce(): Promise<void> {
 /**
  * Runs the daemon
  */
-async function runDaemon(): Promise<void> {
-  const firstRun = await isFirstRun();
+async function runDaemon(configPath?: string): Promise<void> {
+  const firstRun = await isFirstRun(configPath);
 
   if (firstRun) {
     console.log("🦦 Welcome to OtterAssist!");
@@ -320,7 +323,7 @@ async function runDaemon(): Promise<void> {
 
   let components: Components | undefined;
   try {
-    components = await initializeComponents();
+    components = await initializeComponents(configPath);
     const { config, scheduler, extensionManager, eventQueue } = components;
 
     console.log("🦦 OtterAssist daemon starting...");
@@ -384,22 +387,22 @@ export async function runCli(): Promise<void> {
 
   // Handle status
   if (options.status) {
-    await showStatus();
+    await showStatus(options.config);
     process.exit(0);
   }
 
   // Handle events
   if (options.events) {
-    await listEvents();
+    await listEvents(options.config);
     process.exit(0);
   }
 
   // Handle once
   if (options.once) {
-    await runOnce();
+    await runOnce(options.config);
     process.exit(0);
   }
 
   // Default: start daemon
-  await runDaemon();
+  await runDaemon(options.config);
 }
