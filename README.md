@@ -248,6 +248,18 @@ bun run build
 - [Architecture](./docs/architecture.md) - How OtterAssist works
 - [Configuration](./docs/configuration.md) - Configuration options
 - [Extension Development](./docs/extensions.md) - Creating extensions
+- [Example Extensions](./examples/extensions/README.md) - Ready-to-use examples
+
+## Examples
+
+The `examples/extensions/` directory contains example extensions you can use as templates:
+
+| Example | Description |
+|---------|-------------|
+| [hello.ts](./examples/extensions/hello.ts) | Minimal extension with events only |
+| [file-watcher.ts](./examples/extensions/file-watcher.ts) | Watch a directory for new files |
+| [scheduled-reminder.ts](./examples/extensions/scheduled-reminder.ts) | Periodic reminders at specific times |
+| [webhook-receiver.ts](./examples/extensions/webhook-receiver.ts) | Receive webhooks via local server |
 
 ## License
 

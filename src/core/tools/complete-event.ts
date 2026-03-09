@@ -1,11 +1,22 @@
 /**
- * Tool to mark an event as completed
+ * Tool to mark an event as completed.
+ *
+ * This tool allows the AI agent to mark events as complete after
+ * processing them. Completed events are removed from the pending queue
+ * and will not be processed again.
+ *
+ * The agent should only call this when it has fully resolved an event.
+ * If the agent makes partial progress, it should use update_event_progress
+ * instead and leave the event pending.
+ *
+ * @see AgentRunner - Creates and registers this tool
+ * @see EventQueue - Where events are stored and updated
  */
-
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { type Static, Type } from "@sinclair/typebox";
 import type { EventQueue } from "../../types/index.ts";
 
+/** Parameters schema for complete_event tool */
 const parameters = Type.Object({
   eventId: Type.String({
     description: "The ID of the event to mark as completed",
@@ -13,7 +24,17 @@ const parameters = Type.Object({
 });
 
 /**
- * Creates the complete_event tool
+ * Creates the complete_event tool for use by the AI agent.
+ *
+ * @param eventQueue - The event queue to update
+ * @returns A ToolDefinition that marks an event as completed
+ *
+ * @example
+ * ```typescript
+ * const tool = createCompleteEventTool(eventQueue);
+ * // Agent can call: complete_event({ eventId: "abc-123-def" })
+ * // Returns: "Marked event abc-123-def as completed: \"New issue...\""
+ * ```
  */
 export function createCompleteEventTool(
   eventQueue: EventQueue,
