@@ -314,6 +314,7 @@ The `examples/extensions/` directory contains example extensions you can use as 
 | [file-watcher.ts](./examples/extensions/file-watcher.ts) | Watch a directory for new files |
 | [scheduled-reminder.ts](./examples/extensions/scheduled-reminder.ts) | Periodic reminders at specific times |
 | [webhook-receiver.ts](./examples/extensions/webhook-receiver.ts) | Receive webhooks via local server |
+| [messaging/](./examples/extensions/messaging/) | Bidirectional user-agent communication via SQLite |
 
 ## License
 
