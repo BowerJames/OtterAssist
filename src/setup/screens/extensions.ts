@@ -118,7 +118,7 @@ class ExtensionsScreen extends Container implements ScreenComponent {
     this.addChild(
       new Text(
         this.theme.dim(
-          "     ←/→ or Enter to toggle, Enter to continue, Escape to cancel",
+          "     ←/→ or Space to toggle, Enter to continue, Escape to cancel",
         ),
         0,
         0,
@@ -133,8 +133,13 @@ class ExtensionsScreen extends Container implements ScreenComponent {
       // No extensions, just continue
       this.onResult?.("next");
     } else if (this.extensions.length > 0) {
-      // Pass to settings list
-      this.settingsList.handleInput(data);
+      // Enter continues to next screen
+      if (matchesKey(data, Key.enter)) {
+        this.onResult?.("next");
+      } else {
+        // Pass other input to settings list (arrows, space for toggle)
+        this.settingsList.handleInput(data);
+      }
     }
   }
 }

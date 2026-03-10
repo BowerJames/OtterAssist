@@ -78,22 +78,25 @@ async function scanDirectory(
   }
 
   try {
-    const entries = await Array.fromAsync(new Bun.Glob("*").scan(dir));
+    const { readdir } = await import("node:fs/promises");
+    const entries = await readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
-      const fullPath = join(dir, entry);
+      const fullPath = join(dir, entry.name);
 
       // Check if it's a .ts file directly
-      if (entry.endsWith(".ts")) {
-        const name = basename(entry, ".ts");
+      if (entry.isFile() && entry.name.endsWith(".ts")) {
+        const name = basename(entry.name, ".ts");
         discovered.set(name, fullPath);
         continue;
       }
 
       // Check if it's a directory with index.ts
-      const indexPath = join(fullPath, "index.ts");
-      if (existsSync(indexPath)) {
-        discovered.set(entry, indexPath);
+      if (entry.isDirectory()) {
+        const indexPath = join(fullPath, "index.ts");
+        if (existsSync(indexPath)) {
+          discovered.set(entry.name, indexPath);
+        }
       }
     }
   } catch (error) {

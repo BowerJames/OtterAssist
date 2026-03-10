@@ -1,0 +1,5 @@
+#!/bin/bash
+# Resolve the symlink to get the actual script location
+SCRIPT_PATH="$(readlink -f "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+exec bun run "$SCRIPT_DIR/../src/index.ts" "$@"

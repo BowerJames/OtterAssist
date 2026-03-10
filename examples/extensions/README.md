@@ -10,6 +10,7 @@ This directory contains example OtterAssist extensions demonstrating the extensi
 | [file-watcher.ts](./file-watcher.ts) | Watch a directory for new files |
 | [scheduled-reminder.ts](./scheduled-reminder.ts) | Periodic reminders at specific times |
 | [webhook-receiver.ts](./webhook-receiver.ts) | Receive webhooks via local server |
+| [messaging/](./messaging/) | Bidirectional user-agent messaging via SQLite |
 
 ## Using Examples
 
@@ -106,6 +107,7 @@ export default {
 2. **Read [file-watcher.ts](./file-watcher.ts)** - See events + skill together
 3. **Study [scheduled-reminder.ts](./scheduled-reminder.ts)** - Learn about state management
 4. **Explore [webhook-receiver.ts](./webhook-receiver.ts)** - See HTTP server integration
+5. **Try [messaging/](./messaging/)** - Full-featured extension with SQLite database
 
 ## Dependencies
 
