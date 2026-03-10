@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs";
 import { lstat, mkdir, readdir, rm, stat, symlink } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { loadConfig, saveConfig } from "../config/loader.ts";
 import type { Logger } from "../types/index.ts";
 import { GLOBAL_EXTENSIONS_DIR, loadExtension } from "./index.ts";
