@@ -32,6 +32,7 @@ const createMockEventQueue = (events: Event[] = []): EventQueue => ({
   updateProgress: mock(async () => {}),
   markComplete: mock(async () => {}),
   purgeCompleted: mock(async () => 0),
+  close: mock(() => {}),
 });
 
 // Mock agent runner
@@ -97,13 +98,13 @@ describe("Orchestrator", () => {
       const eventQueue = createMockEventQueue(events);
 
       // Create a runner that takes time to complete
-      let resolveRun: ((result: AgentRunResult) => void) | null = null;
+      let resolveRun: ((result: AgentRunResult) => void) | undefined;
       const runPromise = new Promise<AgentRunResult>((resolve) => {
         resolveRun = resolve;
       });
 
       const agentRunner: Runner = {
-        run: mock(() => runPromise),
+        run: async () => runPromise,
       };
 
       const orchestrator = new Orchestrator({

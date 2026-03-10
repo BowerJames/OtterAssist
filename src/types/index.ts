@@ -148,10 +148,7 @@ export interface EventSourceDefinition {
    * @param config - Extension-specific configuration from config file
    * @param context - OtterAssist context (logger, config dir, etc.)
    */
-  initialize?(
-    config: unknown,
-    context: OAExtensionContext,
-  ): Promise<void>;
+  initialize?(config: unknown, context: OAExtensionContext): Promise<void>;
 
   /**
    * Called once when OtterAssist shuts down.

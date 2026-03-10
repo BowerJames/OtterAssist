@@ -3,8 +3,10 @@
  */
 
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { Logger } from "../types/index.ts";
-import type { OrchestratorRunResult } from "./orchestrator.ts";
+import type { ExtensionManager } from "../extensions/manager.ts";
+import type { EventQueue, Logger } from "../types/index.ts";
+import type { Orchestrator, OrchestratorRunResult } from "./orchestrator.ts";
+import type { Runner } from "./runner.ts";
 import { Scheduler } from "./scheduler.ts";
 
 // Mock logger
@@ -16,37 +18,54 @@ const createMockLogger = (): Logger => ({
 });
 
 // Mock event queue
-const createMockEventQueue = () => ({
-  add: mock(async () => {}),
-  getPending: mock(async () => []),
-  getById: mock(async () => null),
-  updateProgress: mock(async () => {}),
-  markComplete: mock(async () => {}),
-  purgeCompleted: mock(async () => 0),
-});
+const createMockEventQueue = (): EventQueue =>
+  ({
+    add: mock(async () => {}),
+    getPending: mock(async () => []),
+    getById: mock(async () => null),
+    updateProgress: mock(async () => {}),
+    markComplete: mock(async () => {}),
+    purgeCompleted: mock(async () => 0),
+    close: mock(() => {}),
+  }) as unknown as EventQueue;
 
 // Mock extension manager
-const createMockExtensionManager = (messages: string[] = []) => ({
-  pollAll: mock(async () => messages),
-  loadAll: mock(async () => {}),
-  shutdownAll: mock(async () => {}),
-  get: mock(() => undefined),
-  getLoadedNames: mock(() => []),
-});
+const createMockExtensionManager = (
+  messages: string[] = [],
+): ExtensionManager =>
+  ({
+    pollAll: mock(async () => messages),
+    loadAll: mock(async () => {}),
+    shutdownAll: mock(async () => {}),
+    get: mock(() => undefined),
+    getLoadedNames: mock(() => []),
+    extensions: [],
+    piExtensions: [],
+    logger: createMockLogger(),
+    config: { pollIntervalSeconds: 60, extensions: {} },
+    hasPiExtensions: () => false,
+    getPiExtensions: () => [],
+  }) as unknown as ExtensionManager;
 
 // Mock orchestrator
 const createMockOrchestrator = (
   result: OrchestratorRunResult = { started: false, skipReason: "no_events" },
-) => ({
-  checkAndRun: mock(async () => result),
-  getStatus: mock(async () => ({
+): Orchestrator =>
+  ({
+    checkAndRun: mock(async () => result),
+    getStatus: mock(async () => ({
+      isRunning: false,
+      currentRunId: null,
+      pendingEventCount: 0,
+    })),
+    getIsRunning: mock(() => false),
+    getCurrentRunId: mock(() => null),
+    eventQueue: createMockEventQueue(),
+    agentRunner: {} as unknown as Runner,
+    logger: createMockLogger(),
     isRunning: false,
     currentRunId: null,
-    pendingEventCount: 0,
-  })),
-  getIsRunning: mock(() => false),
-  getCurrentRunId: mock(() => null),
-});
+  }) as unknown as Orchestrator;
 
 describe("Scheduler", () => {
   let mockLogger: Logger;
@@ -153,18 +172,15 @@ describe("Scheduler", () => {
     });
 
     it("should wait for in-progress tick to complete", async () => {
-      let resolvePoll: () => void;
+      let resolvePoll: (() => void) | undefined;
       const pollPromise = new Promise<string[]>((resolve) => {
         resolvePoll = () => resolve([]);
       });
 
-      const extensionManager = {
-        pollAll: mock(() => pollPromise),
-        loadAll: mock(async () => {}),
-        shutdownAll: mock(async () => {}),
-        get: mock(() => undefined),
-        getLoadedNames: mock(() => []),
-      };
+      const extensionManager = createMockExtensionManager();
+      (extensionManager.pollAll as ReturnType<typeof mock>).mockImplementation(
+        () => pollPromise,
+      );
 
       const eventQueue = createMockEventQueue();
       const orchestrator = createMockOrchestrator();
@@ -314,15 +330,12 @@ describe("Scheduler", () => {
     });
 
     it("should continue if extension poll fails", async () => {
-      const extensionManager = {
-        pollAll: mock(async () => {
+      const extensionManager = createMockExtensionManager();
+      (extensionManager.pollAll as ReturnType<typeof mock>).mockImplementation(
+        async () => {
           throw new Error("Poll failed");
-        }),
-        loadAll: mock(async () => {}),
-        shutdownAll: mock(async () => {}),
-        get: mock(() => undefined),
-        getLoadedNames: mock(() => []),
-      };
+        },
+      );
 
       const eventQueue = createMockEventQueue();
       const orchestrator = createMockOrchestrator();
@@ -348,18 +361,14 @@ describe("Scheduler", () => {
         "event 2",
       ]);
 
-      const eventQueue = {
-        add: mock(async (message: string) => {
+      const eventQueue = createMockEventQueue();
+      (eventQueue.add as ReturnType<typeof mock>).mockImplementation(
+        async (message: string) => {
           if (message === "event 1") {
             throw new Error("Failed to add");
           }
-        }),
-        getPending: mock(async () => []),
-        getById: mock(async () => null),
-        updateProgress: mock(async () => {}),
-        markComplete: mock(async () => {}),
-        purgeCompleted: mock(async () => 0),
-      };
+        },
+      );
 
       const orchestrator = createMockOrchestrator();
 
@@ -381,25 +390,22 @@ describe("Scheduler", () => {
     });
 
     it("should skip tick if one is already in progress", async () => {
-      let resolvePoll: () => void;
+      let resolvePoll: (() => void) | undefined;
       const pollPromise = new Promise<string[]>((resolve) => {
         resolvePoll = () => resolve([]);
       });
 
       let pollCallCount = 0;
-      const extensionManager = {
-        pollAll: mock(async () => {
+      const extensionManager = createMockExtensionManager();
+      (extensionManager.pollAll as ReturnType<typeof mock>).mockImplementation(
+        async () => {
           pollCallCount++;
           if (pollCallCount === 1) {
             return pollPromise;
           }
           return [];
-        }),
-        loadAll: mock(async () => {}),
-        shutdownAll: mock(async () => {}),
-        get: mock(() => undefined),
-        getLoadedNames: mock(() => []),
-      };
+        },
+      );
 
       const eventQueue = createMockEventQueue();
       const orchestrator = createMockOrchestrator();

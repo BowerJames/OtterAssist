@@ -8,8 +8,8 @@ import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { CONFIG_DIR } from "../config/loader.ts";
 import type { Config, Logger, OAExtensionContext } from "../types/index.ts";
 import {
-  type LoadedExtension,
   discoverExtensions,
+  type LoadedExtension,
   loadExtension,
 } from "./loader.ts";
 

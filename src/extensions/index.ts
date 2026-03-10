@@ -2,27 +2,26 @@
  * Extension system exports
  */
 
+// Re-export ExtensionFactory from pi for extension authors
+export type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
 // Re-export types
 export type {
-  // New format
-  OtterAssistExtension,
-  OAExtensionContext,
   EventSourceDefinition,
-  PiExtensionFunction,
   // Legacy format (deprecated)
   EventSourceExtension,
   ExtensionContext,
+  OAExtensionContext,
+  // New format
+  OtterAssistExtension,
+  PiExtensionFunction,
 } from "../types/index.ts";
-
-// Re-export ExtensionFactory from pi for extension authors
-export type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
 
 // Re-export loader
 export {
-  type LoadedExtension,
   discoverExtensions,
   GLOBAL_EXTENSIONS_DIR,
   LOCAL_EXTENSIONS_DIR,
+  type LoadedExtension,
   loadExtension,
 } from "./loader.ts";
 
