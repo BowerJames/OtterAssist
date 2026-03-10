@@ -126,7 +126,7 @@ export default {
     expect(extension.piExtension).toBeUndefined();
 
     // Test poll works
-    const messages = await extension.events!.poll();
+    const messages = await extension.events?.poll();
     expect(messages).toEqual(["event1", "event2"]);
 
     await cleanupTestDir();
@@ -165,7 +165,7 @@ export default {
     expect(extension.events).toBeDefined();
     expect(extension.piExtension).toBeUndefined();
 
-    const messages = await extension.events!.poll();
+    const messages = await extension.events?.poll();
     expect(messages).toEqual(["new-event"]);
 
     await cleanupTestDir();
@@ -227,7 +227,7 @@ export default {
     expect(extension.events).toBeDefined();
     expect(extension.piExtension).toBeDefined();
 
-    const messages = await extension.events!.poll();
+    const messages = await extension.events?.poll();
     expect(messages).toEqual(["full-event"]);
 
     await cleanupTestDir();

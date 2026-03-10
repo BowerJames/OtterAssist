@@ -15,7 +15,18 @@ export type {
   OtterAssistExtension,
   PiExtensionFunction,
 } from "../types/index.ts";
-
+// Re-export installer
+export {
+  disableExtension,
+  enableExtension,
+  getInstalledExtension,
+  type InstalledExtension,
+  type InstallOptions,
+  type InstallResult,
+  installExtension,
+  listInstalledExtensions,
+  uninstallExtension,
+} from "./installer.ts";
 // Re-export loader
 export {
   discoverExtensions,
@@ -24,6 +35,5 @@ export {
   type LoadedExtension,
   loadExtension,
 } from "./loader.ts";
-
 // Re-export manager
 export { ExtensionManager } from "./manager.ts";
