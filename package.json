@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "bin": {
-    "otterassist": "./dist/index.js"
+    "otterassist": "./bin/otterassist"
   },
   "scripts": {
     "dev": "bun run --watch src/index.ts",
