@@ -189,7 +189,7 @@ export class AgentRunner {
       }
       if (extensionsResult.errors.length > 0) {
         for (const error of extensionsResult.errors) {
-          this.logger.warn(`Pi extension error: ${error.message}`);
+          this.logger.warn(`Pi extension error: ${error.error}`);
         }
       }
 

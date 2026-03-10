@@ -28,6 +28,7 @@ const createMockEventQueue = (): EventQueue => ({
   updateProgress: mock(async () => {}),
   markComplete: mock(async () => {}),
   purgeCompleted: mock(async () => 0),
+  close: mock(() => {}),
 });
 
 describe("AgentRunner", () => {
