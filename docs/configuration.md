@@ -115,6 +115,13 @@ Whether the extension is loaded and polled.
 }
 ```
 
+You can also enable/disable extensions via CLI:
+
+```bash
+otterassist enable my-extension
+otterassist disable my-extension
+```
+
 #### config
 
 Extension-specific configuration. The schema depends on the extension.
@@ -145,13 +152,40 @@ OtterAssist uses the following directory structure:
 ├── config.json        # Main configuration
 ├── events.db          # SQLite event queue
 ├── extensions/        # Extension modules
-│   ├── github.ts
-│   ├── messaging.ts
-│   └── my-extension/
-│       └── index.ts
+│   ├── github/
+│   │   └── index.ts
+│   ├── messaging/
+│   │   ├── index.ts
+│   │   └── package.json
+│   └── my-extension.ts -> /dev/my-extension.ts  # symlink (if installed with --link)
 └── agent/             # Pi agent files
     └── auth.json      # API keys (managed by pi)
 ```
+
+## Managing Extensions
+
+Extensions can be managed via the CLI:
+
+```bash
+# List installed extensions
+otterassist extensions
+
+# Show extension details
+otterassist extensions show my-extension
+
+# Enable/disable extensions
+otterassist enable my-extension
+otterassist disable my-extension
+
+# Install a new extension
+otterassist install ./my-extension.ts
+otterassist install github:user/repo
+
+# Uninstall an extension
+otterassist uninstall my-extension
+```
+
+See [Extension Development](./extensions.md) for more details on installing and creating extensions.
 
 ## Environment Variables
 

@@ -82,6 +82,7 @@ bun run start -- --once
 
 USAGE:
   otterassist [OPTIONS]
+  otterassist <COMMAND> [ARGS]
 
 OPTIONS:
   --setup          Run the setup wizard to configure OtterAssist
@@ -92,12 +93,36 @@ OPTIONS:
   -h, --help       Show this help message
   -v, --version    Show version
 
+COMMANDS:
+  install <source>    Install extension from path or git URL
+    --link            Create symlink instead of copy (for development)
+    --force           Overwrite existing extension
+    --no-enable       Don't auto-enable after install
+
+  uninstall <name>    Uninstall an extension
+
+  extensions [list]   List installed extensions
+  extensions show     Show details for an extension
+
+  enable <name>       Enable an extension
+  disable <name>      Disable an extension
+
 EXAMPLES:
-  otterassist              Start the daemon (foreground)
-  otterassist --setup      Configure OtterAssist
-  otterassist --once       Process events once and exit
-  otterassist --status     Show configuration status
-  otterassist --events     List pending events
+  otterassist                        Start the daemon (foreground)
+  otterassist --setup                Configure OtterAssist
+  otterassist --once                 Process events once and exit
+  otterassist --status               Show configuration status
+  otterassist --events               List pending events
+
+  otterassist install ./my-extension
+  otterassist install ./my-extension --link
+  otterassist install github:user/repo
+  otterassist install https://github.com/user/repo.git
+
+  otterassist extensions
+  otterassist enable github-issues
+  otterassist disable file-watcher
+  otterassist uninstall my-extension
 ```
 
 ## Configuration
@@ -133,7 +158,36 @@ See [Configuration Documentation](./docs/configuration.md) for details.
 
 ## Extensions
 
-Extensions add new event sources and capabilities to OtterAssist. They're stored in `~/.otterassist/extensions/`.
+Extensions add new event sources and capabilities to OtterAssist.
+
+### Installing Extensions
+
+```bash
+# Install from local file
+otterassist install ./my-extension.ts
+
+# Install from local directory
+otterassist install ./my-extension/
+
+# Install with symlink (for development)
+otterassist install ./my-extension --link
+
+# Install from GitHub
+otterassist install github:user/otterassist-extensions
+
+# Install from git URL with subdirectory
+otterassist install github:user/repo/tree/main/extensions/github
+
+# List installed extensions
+otterassist extensions
+
+# Enable/disable extensions
+otterassist enable my-extension
+otterassist disable my-extension
+
+# Uninstall
+otterassist uninstall my-extension
+```
 
 ### Extension Structure
 

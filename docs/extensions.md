@@ -9,6 +9,7 @@ Extensions are self-contained modules that extend OtterAssist with new capabilit
 
 ## Table of Contents
 
+- [Installing Extensions](#installing-extensions)
 - [Quick Start](#quick-start)
 - [Extension Locations](#extension-locations)
 - [Extension Interface](#extension-interface)
@@ -17,6 +18,107 @@ Extensions are self-contained modules that extend OtterAssist with new capabilit
 - [Examples](#examples)
 - [Best Practices](#best-practices)
 - [Debugging](#debugging)
+
+## Installing Extensions
+
+OtterAssist includes a built-in extension installer for managing extensions.
+
+### Install from Local Path
+
+```bash
+# Install from a single file
+otterassist install ./my-extension.ts
+
+# Install from a directory
+otterassist install ./my-extension/
+```
+
+When installing a single file, it's copied as `index.ts` into the extensions directory.
+
+### Install from Git URL
+
+```bash
+# GitHub shorthand
+otterassist install github:user/repo
+otterassist install github:user/repo/tree/main/extensions/my-extension
+
+# GitLab shorthand
+otterassist install gitlab:user/repo
+
+# Full git URL
+otterassist install https://github.com/user/repo.git
+```
+
+For git URLs, the repository is cloned and the extension is copied to `~/.otterassist/extensions/`.
+
+### Development Mode (Symlinks)
+
+For extension development, use `--link` to create a symlink instead of copying:
+
+```bash
+otterassist install ./my-extension --link
+```
+
+This allows you to edit the extension files and have changes take effect immediately. The symlink points to your source directory.
+
+### Install Options
+
+| Option | Description |
+|--------|-------------|
+| `--link` | Create symlink instead of copy (for development) |
+| `--force` | Overwrite existing extension |
+| `--no-enable` | Don't auto-enable after install |
+
+### Managing Extensions
+
+```bash
+# List installed extensions
+otterassist extensions
+
+# Show extension details
+otterassist extensions show my-extension
+
+# Enable an extension
+otterassist enable my-extension
+
+# Disable an extension
+otterassist disable my-extension
+
+# Uninstall an extension
+otterassist uninstall my-extension
+```
+
+### Extension Package Structure
+
+Extensions can be:
+
+**Single file:**
+```
+my-extension.ts    # Exports OtterAssistExtension as default
+```
+
+**Full package:**
+```
+my-extension/
+├── index.ts          # Required: exports OtterAssistExtension
+├── package.json      # Optional: dependencies (bun install runs automatically)
+├── otterassist.json  # Optional: metadata
+└── README.md         # Optional: documentation
+```
+
+### Metadata File (otterassist.json)
+
+Optional file for extension metadata:
+
+```json
+{
+  "name": "my-extension",
+  "version": "1.0.0",
+  "description": "Does something useful",
+  "author": "Your Name",
+  "keywords": ["github", "issues"]
+}
+```
 
 ## Quick Start
 
@@ -57,17 +159,17 @@ export default {
 } satisfies OtterAssistExtension;
 ```
 
-Enable it in your config (`~/.otterassist/config.json`):
+Then install and enable it:
 
-```json
-{
-  "pollIntervalSeconds": 60,
-  "extensions": {
-    "my-extension": {
-      "enabled": true
-    }
-  }
-}
+```bash
+# Install the extension
+otterassist install ~/.otterassist/extensions/my-extension.ts
+
+# Or if you created it elsewhere
+otterassist install ./my-extension.ts
+
+# Enable it (happens automatically during install unless --no-enable is used)
+otterassist enable my-extension
 ```
 
 ## Extension Locations
