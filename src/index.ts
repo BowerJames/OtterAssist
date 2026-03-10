@@ -35,16 +35,6 @@ export {
   createListEventsTool,
   createUpdateEventProgressTool,
 } from "./core/tools/index.ts";
-
-// Re-export extension system
-export {
-  discoverExtensions,
-  ExtensionManager,
-  GLOBAL_EXTENSIONS_DIR,
-  type LoadedExtension,
-  loadExtension,
-  LOCAL_EXTENSIONS_DIR,
-} from "./extensions/index.ts";
 export type {
   EventSourceDefinition,
   EventSourceExtension,
@@ -53,6 +43,15 @@ export type {
   OAExtensionContext,
   OtterAssistExtension,
   PiExtensionFunction,
+} from "./extensions/index.ts";
+// Re-export extension system
+export {
+  discoverExtensions,
+  ExtensionManager,
+  GLOBAL_EXTENSIONS_DIR,
+  LOCAL_EXTENSIONS_DIR,
+  type LoadedExtension,
+  loadExtension,
 } from "./extensions/index.ts";
 // Re-export setup wizard
 export {

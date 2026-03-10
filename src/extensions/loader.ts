@@ -173,10 +173,7 @@ function isValidNewExtension(obj: unknown): obj is OtterAssistExtension {
   if (ext.version !== undefined && typeof ext.version !== "string") {
     return false;
   }
-  if (
-    ext.configSchema !== undefined &&
-    typeof ext.configSchema !== "object"
-  ) {
+  if (ext.configSchema !== undefined && typeof ext.configSchema !== "object") {
     return false;
   }
 
