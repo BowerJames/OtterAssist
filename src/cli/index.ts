@@ -10,16 +10,23 @@ import {
   AgentRunner,
   type Config,
   ConsoleLogger,
+  disableExtension,
   discoverExtensionInfo,
   type EventQueue,
   ExtensionManager,
+  enableExtension,
+  getInstalledExtension,
+  type InstallOptions,
+  installExtension,
   isFirstRun,
   type Logger,
+  listInstalledExtensions,
   loadConfig,
   Orchestrator,
   runSetupWizard,
   Scheduler,
   SQLiteEventQueue,
+  uninstallExtension,
 } from "../index.ts";
 
 /** Return type for initializeComponents */
@@ -44,6 +51,16 @@ export interface CliOptions {
   config?: string;
   help: boolean;
   version: boolean;
+  // Extension installer commands
+  install?: string;
+  installLink: boolean;
+  installForce: boolean;
+  installNoEnable: boolean;
+  uninstall?: string;
+  extensionsList: boolean;
+  extensionShow?: string;
+  enable?: string;
+  disable?: string;
 }
 
 /**
@@ -58,6 +75,15 @@ export function parseArgs(args: string[]): CliOptions {
     config: undefined,
     help: false,
     version: false,
+    install: undefined,
+    installLink: false,
+    installForce: false,
+    installNoEnable: false,
+    uninstall: undefined,
+    extensionsList: false,
+    extensionShow: undefined,
+    enable: undefined,
+    disable: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -88,6 +114,48 @@ export function parseArgs(args: string[]): CliOptions {
       case "-v":
         options.version = true;
         break;
+      case "--link":
+        options.installLink = true;
+        break;
+      case "--force":
+        options.installForce = true;
+        break;
+      case "--no-enable":
+        options.installNoEnable = true;
+        break;
+      case "install":
+        options.install = args[++i];
+        break;
+      case "uninstall":
+        options.uninstall = args[++i];
+        break;
+      case "extensions":
+      case "list":
+        // Check next arg for subcommand
+        {
+          const nextArg = args[i + 1];
+          if (nextArg && !nextArg.startsWith("-")) {
+            if (nextArg === "list") {
+              options.extensionsList = true;
+              i++;
+            } else if (nextArg === "show" && args[i + 2]) {
+              options.extensionShow = args[i + 2];
+              i += 2;
+            } else {
+              // Treat unknown subcommand as list
+              options.extensionsList = true;
+            }
+          } else {
+            options.extensionsList = true;
+          }
+        }
+        break;
+      case "enable":
+        options.enable = args[++i];
+        break;
+      case "disable":
+        options.disable = args[++i];
+        break;
       default:
         // Unknown argument - could warn but ignore for now
         break;
@@ -106,6 +174,7 @@ function printHelp(): void {
 
 USAGE:
   otterassist [OPTIONS]
+  otterassist <COMMAND> [ARGS]
 
 OPTIONS:
   --setup          Run the setup wizard to configure OtterAssist
@@ -116,10 +185,34 @@ OPTIONS:
   -h, --help       Show this help message
   -v, --version    Show version
 
+COMMANDS:
+  install <source>    Install extension from path or git URL
+    --link            Create symlink instead of copy (for development)
+    --force           Overwrite existing extension
+    --no-enable       Don't auto-enable after install
+
+  uninstall <name>    Uninstall an extension
+
+  extensions [list]   List installed extensions
+  extensions show     Show details for an extension
+
+  enable <name>       Enable an extension
+  disable <name>      Disable an extension
+
 EXAMPLES:
-  otterassist              Start the daemon (foreground)
-  otterassist --setup      Configure OtterAssist
-  otterassist --once       Process events once and exit
+  otterassist                        Start the daemon (foreground)
+  otterassist --setup                Configure OtterAssist
+  otterassist --once                 Process events once and exit
+
+  otterassist install ./my-extension
+  otterassist install ./my-extension --link
+  otterassist install github:user/repo
+  otterassist install https://github.com/user/repo.git
+
+  otterassist extensions
+  otterassist enable github-issues
+  otterassist disable file-watcher
+  otterassist uninstall my-extension
 `);
 }
 
@@ -370,6 +463,178 @@ async function runDaemon(configPath?: string): Promise<void> {
   }
 }
 
+// ============================================================================
+// Extension Installer Commands
+// ============================================================================
+
+/**
+ * Install an extension
+ */
+async function runInstall(
+  source: string,
+  options: { link: boolean; force: boolean; noEnable: boolean },
+): Promise<void> {
+  const logger = new ConsoleLogger("info");
+
+  console.log(`🦦 Installing extension from: ${source}`);
+  if (options.link) console.log("  Mode: symlink (development)");
+  if (options.force) console.log("  Force: will overwrite existing");
+
+  try {
+    const installOptions: InstallOptions = {
+      link: options.link,
+      force: options.force,
+      enable: !options.noEnable,
+    };
+
+    const result = await installExtension(source, installOptions, logger);
+
+    console.log("\n✅ Extension installed successfully!");
+    console.log(`  Name: ${result.extension.name}`);
+    console.log(`  Description: ${result.extension.description}`);
+    if (result.extension.version) {
+      console.log(`  Version: ${result.extension.version}`);
+    }
+    console.log(`  Path: ${result.extension.path}`);
+    console.log(`  Linked: ${result.wasLinked ? "yes" : "no"}`);
+    console.log(
+      `  Dependencies: ${result.dependenciesInstalled ? "installed" : "none"}`,
+    );
+    console.log(`  Enabled: ${result.wasEnabled ? "yes" : "no"}`);
+
+    if (result.extension.gitUrl) {
+      console.log(`  Source: ${result.extension.gitUrl}`);
+    }
+  } catch (error) {
+    console.error(
+      `❌ Failed to install extension: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Uninstall an extension
+ */
+async function runUninstall(name: string): Promise<void> {
+  const logger = new ConsoleLogger("info");
+
+  console.log(`🦦 Uninstalling extension: ${name}`);
+
+  try {
+    await uninstallExtension(name, logger);
+    console.log("✅ Extension uninstalled successfully");
+  } catch (error) {
+    console.error(
+      `❌ Failed to uninstall extension: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * List installed extensions
+ */
+async function runExtensionsList(): Promise<void> {
+  try {
+    const extensions = await listInstalledExtensions();
+
+    if (extensions.length === 0) {
+      console.log("🦦 No extensions installed");
+      console.log("\nInstall an extension with:");
+      console.log("  otterassist install <path-or-url>");
+      return;
+    }
+
+    console.log(`🦦 Installed Extensions (${extensions.length}):\n`);
+
+    for (const ext of extensions) {
+      const status = ext.enabled ? "✓" : "✗";
+      const linkInfo = ext.linked ? " (linked)" : "";
+      const versionInfo = ext.version ? ` v${ext.version}` : "";
+
+      console.log(`  ${status} ${ext.name}${versionInfo}${linkInfo}`);
+      console.log(`    ${ext.description}`);
+    }
+
+    console.log("\nCommands:");
+    console.log("  otterassist enable <name>    Enable an extension");
+    console.log("  otterassist disable <name>   Disable an extension");
+    console.log("  otterassist extensions show <name>  Show details");
+  } catch (error) {
+    console.error(
+      `❌ Failed to list extensions: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Show extension details
+ */
+async function runExtensionShow(name: string): Promise<void> {
+  try {
+    const ext = await getInstalledExtension(name);
+
+    if (!ext) {
+      console.log(`🦦 Extension "${name}" not found`);
+      process.exit(1);
+    }
+
+    console.log(`🦦 Extension: ${ext.name}\n`);
+    console.log(`  Description: ${ext.description}`);
+    if (ext.version) {
+      console.log(`  Version: ${ext.version}`);
+    }
+    console.log(`  Path: ${ext.path}`);
+    console.log(`  Enabled: ${ext.enabled ? "yes" : "no"}`);
+    console.log(`  Linked: ${ext.linked ? "yes" : "no"}`);
+    if (ext.gitUrl) {
+      console.log(`  Git URL: ${ext.gitUrl}`);
+    }
+    console.log(`  Installed: ${ext.installedAt.toLocaleString()}`);
+  } catch (error) {
+    console.error(
+      `❌ Failed to show extension: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Enable an extension
+ */
+async function runEnable(name: string): Promise<void> {
+  const logger = new ConsoleLogger("info");
+
+  try {
+    await enableExtension(name, logger);
+    console.log(`✅ Extension "${name}" enabled`);
+  } catch (error) {
+    console.error(
+      `❌ Failed to enable extension: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Disable an extension
+ */
+async function runDisable(name: string): Promise<void> {
+  const logger = new ConsoleLogger("info");
+
+  try {
+    await disableExtension(name, logger);
+    console.log(`✅ Extension "${name}" disabled`);
+  } catch (error) {
+    console.error(
+      `❌ Failed to disable extension: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+}
+
 /**
  * Runs the CLI
  */
@@ -391,6 +656,46 @@ export async function runCli(): Promise<void> {
   // Handle setup
   if (options.setup) {
     await runSetup();
+    process.exit(0);
+  }
+
+  // Handle install
+  if (options.install) {
+    await runInstall(options.install, {
+      link: options.installLink,
+      force: options.installForce,
+      noEnable: options.installNoEnable,
+    });
+    process.exit(0);
+  }
+
+  // Handle uninstall
+  if (options.uninstall) {
+    await runUninstall(options.uninstall);
+    process.exit(0);
+  }
+
+  // Handle extensions list
+  if (options.extensionsList) {
+    await runExtensionsList();
+    process.exit(0);
+  }
+
+  // Handle extension show
+  if (options.extensionShow) {
+    await runExtensionShow(options.extensionShow);
+    process.exit(0);
+  }
+
+  // Handle enable
+  if (options.enable) {
+    await runEnable(options.enable);
+    process.exit(0);
+  }
+
+  // Handle disable
+  if (options.disable) {
+    await runDisable(options.disable);
     process.exit(0);
   }
 

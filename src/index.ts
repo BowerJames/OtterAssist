@@ -45,13 +45,23 @@ export type {
   PiExtensionFunction,
 } from "./extensions/index.ts";
 // Re-export extension system
+// Re-export extension installer
 export {
+  disableExtension,
   discoverExtensions,
   ExtensionManager,
+  enableExtension,
   GLOBAL_EXTENSIONS_DIR,
+  getInstalledExtension,
+  type InstalledExtension,
+  type InstallOptions,
+  type InstallResult,
+  installExtension,
   LOCAL_EXTENSIONS_DIR,
   type LoadedExtension,
+  listInstalledExtensions,
   loadExtension,
+  uninstallExtension,
 } from "./extensions/index.ts";
 // Re-export setup wizard
 export {

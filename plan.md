@@ -322,8 +322,141 @@ otterassist --version    # Show version
 | 4 | #10 | Example Extension: File Watcher |
 | 4 | #12 | Testing & Quality |
 | 4 | #11 | Documentation |
+| 5 | #27 | Extension Installer |
 
-**Recommended build order**: 1 → 2 → 3 → 4 → 7 → 6 → 5 → 8 → 9 → 10 → 12 → 11
+**Recommended build order**: 1 → 2 → 3 → 4 → 7 → 6 → 5 → 8 → 9 → 10 → 12 → 11 → 27
+
+## Extension Installer Design (#27)
+
+### CLI Commands
+
+```bash
+# Install from local path
+otterassist install <path>
+
+# Install with symlink (for development)
+otterassist install <path> --link
+
+# Install from git URL
+otterassist install <git-url>
+
+# List installed extensions
+otterassist extensions list
+otterassist extensions
+
+# Show extension details
+otterassist extensions show <name>
+
+# Enable/disable extensions
+otterassist enable <name>
+otterassist disable <name>
+
+# Uninstall extension
+otterassist uninstall <name>
+```
+
+### Install Sources
+
+| Source | Example | Behavior |
+|--------|---------|----------|
+| Local file | `./my-extension.ts` | Copy to `extensions/my-extension/` |
+| Local directory | `./my-extension/` | Copy entire directory |
+| Git URL (GitHub) | `github:user/repo` | Clone to temp, copy extension |
+| Git URL (full) | `https://github.com/user/repo` | Clone to temp, copy extension |
+| Git URL (subdir) | `github:user/repo/tree/main/extensions/foo` | Clone, copy specific subdir |
+
+### Installation Process
+
+1. **Resolve source** - Determine if path, URL, or shorthand
+2. **Fetch extension** - Copy local or clone git to temp
+3. **Validate** - Load and verify valid `OtterAssistExtension`
+4. **Check conflicts** - Error if exists (unless `--force`)
+5. **Install** - Copy or symlink to `~/.otterassist/extensions/<name>/`
+6. **Dependencies** - Run `bun install` if `package.json` exists
+7. **Update config** - Add with `enabled: true` (or `--no-enable`)
+
+### Extension Package Structure
+
+**Single file:**
+```
+my-extension.ts    # Exports OtterAssistExtension as default
+```
+
+**Full package:**
+```
+my-extension/
+├── index.ts          # Required: exports OtterAssistExtension
+├── package.json      # Optional: dependencies
+├── otterassist.json  # Optional: metadata (name overrides, version, etc.)
+└── README.md         # Optional: documentation
+```
+
+### Installer API
+
+```typescript
+// src/extensions/installer.ts
+
+interface InstallOptions {
+  link?: boolean;      // Create symlink instead of copy
+  force?: boolean;     // Overwrite existing
+  enable?: boolean;    // Auto-enable in config (default: true)
+  subdir?: string;     // Subdirectory within git repo
+}
+
+interface InstalledExtension {
+  name: string;
+  description: string;
+  path: string;
+  version?: string;
+  linked: boolean;
+  gitUrl?: string;
+  installedAt: Date;
+}
+
+interface InstallResult {
+  extension: InstalledExtension;
+  dependenciesInstalled: boolean;
+  wasLinked: boolean;
+  wasEnabled: boolean;
+}
+
+// Core functions
+async function installExtension(source: string, options?: InstallOptions): Promise<InstallResult>;
+async function uninstallExtension(name: string): Promise<void>;
+async function listInstalledExtensions(): Promise<InstalledExtension[]>;
+async function getInstalledExtension(name: string): Promise<InstalledExtension | null>;
+async function enableExtension(name: string): Promise<void>;
+async function disableExtension(name: string): Promise<void>;
+```
+
+### Metadata File (otterassist.json)
+
+Optional file for extension metadata:
+
+```json
+{
+  "name": "my-extension",
+  "version": "1.0.0",
+  "description": "Does something useful",
+  "author": "Your Name",
+  "repository": "https://github.com/user/otterassist-my-extension",
+  "keywords": ["github", "issues"],
+  "piExtensions": ["./pi-tools.ts"]
+}
+```
+
+### Git URL Formats
+
+| Format | Resolves To |
+|--------|-------------|
+| `github:user/repo` | `https://github.com/user/repo.git` |
+| `gitlab:user/repo` | `https://gitlab.com/user/repo.git` |
+| `https://...` | Used directly |
+| `git+https://...` | Used directly (strip `git+`) |
+
+For subdirectories:
+- `github:user/repo/tree/main/extensions/foo`
+- Parse URL to extract branch and path
 
 ## pi SDK Integration
 
