@@ -26,9 +26,11 @@ export default {
   description: "Bidirectional messaging between user and agent via SQLite",
   version: "1.0.0",
 
+  defaultConfig: {},
+
   events: {
     async initialize(cfg: MessagingConfig, context: OAExtensionContext) {
-      dbPath = cfg.dbPath ?? `${context.configDir}/messages.db`;
+      dbPath = cfg?.dbPath ?? `${context.configDir}/messages.db`;
       logger = context.logger;
 
       db = await MessageDatabase.create(dbPath, logger);
