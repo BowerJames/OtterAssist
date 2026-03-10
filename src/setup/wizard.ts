@@ -45,7 +45,7 @@ export type ScreenResult = "next" | "back" | "done" | "cancel";
  * Screen component interface
  */
 export interface ScreenComponent extends Component {
-  onResult?: (result: ScreenResult) => void;
+  onResult?: (result: ScreenResult) => void | Promise<void>;
 }
 
 /**
@@ -164,12 +164,12 @@ export class SetupWizard {
         const screen = factory(this.tui, this.theme, this.state);
 
         // Set up result handler
-        screen.onResult = (result: ScreenResult) => {
+        screen.onResult = async (result: ScreenResult) => {
           switch (result) {
             case "next":
               if (this.currentScreenIndex === this.screens.length - 1) {
                 // Last screen - save and exit
-                this.saveConfig();
+                await this.saveConfig();
                 this.saved = true;
                 cleanup();
               } else {
@@ -180,7 +180,7 @@ export class SetupWizard {
               showScreen(this.currentScreenIndex - 1);
               break;
             case "done":
-              this.saveConfig();
+              await this.saveConfig();
               this.saved = true;
               cleanup();
               break;
