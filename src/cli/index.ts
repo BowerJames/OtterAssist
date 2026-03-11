@@ -27,8 +27,8 @@ import {
   Orchestrator,
   runSetupWizard,
   Scheduler,
-  setWrapUpPrompt,
   SQLiteEventQueue,
+  setWrapUpPrompt,
   uninstallExtension,
 } from "../index.ts";
 
@@ -708,12 +708,16 @@ async function runBuiltInsWrapUp(options: {
 
   // Validate that either message or file is provided, but not both
   if (options.message && options.file) {
-    console.error("❌ Cannot use both a message and a file. Please specify only one.");
+    console.error(
+      "❌ Cannot use both a message and a file. Please specify only one.",
+    );
     process.exit(1);
   }
 
   if (!options.message && !options.file) {
-    console.error("❌ Please provide a message or specify a file with -f <file>");
+    console.error(
+      "❌ Please provide a message or specify a file with -f <file>",
+    );
     process.exit(1);
   }
 
@@ -732,10 +736,14 @@ async function runBuiltInsWrapUp(options: {
 
       content = await file.text();
       console.log(`🦦 Setting wrap_up prompt from: ${options.file}`);
-    } else {
+    } else if (options.message) {
       // Use the provided message
-      content = options.message!;
+      content = options.message;
       console.log("🦦 Setting wrap_up prompt...");
+    } else {
+      // This shouldn't happen due to earlier validation, but TypeScript needs it
+      console.error("❌ No message or file provided");
+      process.exit(1);
     }
 
     await setWrapUpPrompt(agentDir, content);
