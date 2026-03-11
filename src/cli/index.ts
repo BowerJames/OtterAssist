@@ -10,12 +10,14 @@ import {
   AgentRunner,
   type Config,
   ConsoleLogger,
+  DEFAULT_AGENT_DIR,
   disableExtension,
   discoverExtensionInfo,
   type EventQueue,
   ExtensionManager,
   enableExtension,
   getInstalledExtension,
+  getWrapUpPrompt,
   type InstallOptions,
   installExtension,
   isFirstRun,
@@ -25,6 +27,7 @@ import {
   Orchestrator,
   runSetupWizard,
   Scheduler,
+  setWrapUpPrompt,
   SQLiteEventQueue,
   uninstallExtension,
 } from "../index.ts";
@@ -61,6 +64,11 @@ export interface CliOptions {
   extensionShow?: string;
   enable?: string;
   disable?: string;
+  // Built-ins wrap-up command
+  builtinsWrapUp: boolean;
+  builtinsWrapUpSet: boolean;
+  builtinsWrapUpMessage?: string;
+  builtinsWrapUpFile?: string;
 }
 
 /**
@@ -84,6 +92,10 @@ export function parseArgs(args: string[]): CliOptions {
     extensionShow: undefined,
     enable: undefined,
     disable: undefined,
+    builtinsWrapUp: false,
+    builtinsWrapUpSet: false,
+    builtinsWrapUpMessage: undefined,
+    builtinsWrapUpFile: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -156,6 +168,35 @@ export function parseArgs(args: string[]): CliOptions {
       case "disable":
         options.disable = args[++i];
         break;
+      case "built-ins":
+        // Check for wrap-up subcommand
+        if (args[i + 1] === "wrap-up") {
+          options.builtinsWrapUp = true;
+          i++;
+          // Check for --set flag
+          if (args[i + 1] === "--set") {
+            options.builtinsWrapUpSet = true;
+            i++;
+            // Check for -f flag or direct message
+            const nextArg = args[i + 1];
+            if (nextArg === "-f" || nextArg === "--file") {
+              i++;
+              options.builtinsWrapUpFile = args[i + 1];
+              i++;
+            } else if (nextArg && !nextArg.startsWith("-")) {
+              // Collect the rest of the arguments as the message
+              const messageParts: string[] = [];
+              let msgArg = args[i + 1];
+              while (msgArg && !msgArg.startsWith("-")) {
+                messageParts.push(msgArg);
+                i++;
+                msgArg = args[i + 1];
+              }
+              options.builtinsWrapUpMessage = messageParts.join(" ");
+            }
+          }
+        }
+        break;
       default:
         // Unknown argument - could warn but ignore for now
         break;
@@ -199,6 +240,10 @@ COMMANDS:
   enable <name>       Enable an extension
   disable <name>      Disable an extension
 
+  built-ins wrap-up                    Show current wrap_up prompt
+  built-ins wrap-up --set <message>    Set wrap_up prompt from string
+  built-ins wrap-up --set -f <file>    Set wrap_up prompt from file
+
 EXAMPLES:
   otterassist                        Start the daemon (foreground)
   otterassist --setup                Configure OtterAssist
@@ -213,6 +258,10 @@ EXAMPLES:
   otterassist enable github-issues
   otterassist disable file-watcher
   otterassist uninstall my-extension
+
+  otterassist built-ins wrap-up
+  otterassist built-ins wrap-up --set "Custom wrap up message"
+  otterassist built-ins wrap-up --set -f ./my-wrap-up.md
 `);
 }
 
@@ -635,6 +684,70 @@ async function runDisable(name: string): Promise<void> {
   }
 }
 
+// ============================================================================
+// Built-ins Commands
+// ============================================================================
+
+/**
+ * Handle built-ins wrap-up command
+ */
+async function runBuiltInsWrapUp(options: {
+  set: boolean;
+  message?: string;
+  file?: string;
+}): Promise<void> {
+  const agentDir = DEFAULT_AGENT_DIR;
+
+  // If --set is not provided, just display the current prompt
+  if (!options.set) {
+    const content = await getWrapUpPrompt(agentDir);
+    console.log("🦦 Current wrap_up prompt:\n");
+    console.log(content);
+    return;
+  }
+
+  // Validate that either message or file is provided, but not both
+  if (options.message && options.file) {
+    console.error("❌ Cannot use both a message and a file. Please specify only one.");
+    process.exit(1);
+  }
+
+  if (!options.message && !options.file) {
+    console.error("❌ Please provide a message or specify a file with -f <file>");
+    process.exit(1);
+  }
+
+  try {
+    let content: string;
+
+    if (options.file) {
+      // Read content from file
+      const file = Bun.file(options.file);
+      const exists = await file.exists();
+
+      if (!exists) {
+        console.error(`❌ File not found: ${options.file}`);
+        process.exit(1);
+      }
+
+      content = await file.text();
+      console.log(`🦦 Setting wrap_up prompt from: ${options.file}`);
+    } else {
+      // Use the provided message
+      content = options.message!;
+      console.log("🦦 Setting wrap_up prompt...");
+    }
+
+    await setWrapUpPrompt(agentDir, content);
+    console.log("✅ wrap_up prompt updated");
+  } catch (error) {
+    console.error(
+      `❌ Failed to set wrap_up prompt: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+}
+
 /**
  * Runs the CLI
  */
@@ -696,6 +809,16 @@ export async function runCli(): Promise<void> {
   // Handle disable
   if (options.disable) {
     await runDisable(options.disable);
+    process.exit(0);
+  }
+
+  // Handle built-ins wrap-up
+  if (options.builtinsWrapUp) {
+    await runBuiltInsWrapUp({
+      set: options.builtinsWrapUpSet,
+      message: options.builtinsWrapUpMessage,
+      file: options.builtinsWrapUpFile,
+    });
     process.exit(0);
   }
 

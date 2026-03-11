@@ -44,6 +44,56 @@ Once you have done this you can stop.
 const WRAP_UP_FILENAME = "wrap_up.md";
 
 /**
+ * Gets the path to the wrap_up prompt file.
+ *
+ * @param agentDir - The agent directory path (e.g., ~/.otterassist/agent)
+ * @returns The full path to wrap_up.md
+ */
+export function getWrapUpPromptPath(agentDir: string): string {
+  return join(agentDir, "prompts", WRAP_UP_FILENAME);
+}
+
+/**
+ * Gets the current wrap_up prompt content.
+ * Returns the default prompt if the file doesn't exist yet.
+ *
+ * @param agentDir - The agent directory path (e.g., ~/.otterassist/agent)
+ * @returns The wrap_up prompt content
+ */
+export async function getWrapUpPrompt(agentDir: string): Promise<string> {
+  const wrapUpPath = getWrapUpPromptPath(agentDir);
+  const file = Bun.file(wrapUpPath);
+  const exists = await file.exists();
+
+  if (!exists) {
+    return WRAP_UP_PROMPT;
+  }
+
+  return await file.text();
+}
+
+/**
+ * Sets the wrap_up prompt content.
+ * Creates the prompts directory if it doesn't exist.
+ *
+ * @param agentDir - The agent directory path (e.g., ~/.otterassist/agent)
+ * @param content - The new wrap_up prompt content
+ */
+export async function setWrapUpPrompt(
+  agentDir: string,
+  content: string,
+): Promise<void> {
+  const promptsDir = join(agentDir, "prompts");
+  const wrapUpPath = getWrapUpPromptPath(agentDir);
+
+  // Create prompts directory if it doesn't exist
+  await mkdir(promptsDir, { recursive: true });
+
+  // Write the wrap_up prompt
+  await Bun.write(wrapUpPath, content);
+}
+
+/**
  * Ensures the wrap_up prompt template exists in the agent directory.
  * Creates the prompts directory and wrap_up.md file if they don't exist.
  *
