@@ -26,7 +26,10 @@ export {
   type AgentRunResult,
   DEFAULT_AGENT_DIR,
   ensureWrapUpPrompt,
+  getWrapUpPrompt,
+  getWrapUpPromptPath,
   type Runner,
+  setWrapUpPrompt,
   WRAP_UP_PROMPT,
 } from "./core/runner.ts";
 export { Scheduler } from "./core/scheduler.ts";
