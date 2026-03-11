@@ -4,6 +4,7 @@
  * @see Issue #23 (pi extension integration)
  */
 
+import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -25,6 +26,57 @@ import {
 
 /** Default agent directory for OtterAssist */
 export const DEFAULT_AGENT_DIR = join(homedir(), ".otterassist", "agent");
+
+/** Wrap up prompt content for the /wrap_up command */
+export const WRAP_UP_PROMPT = `---
+description: Wrap up the current session and update event progress
+---
+You must wrap up now. Please stop handling the event(s) immediately. Complete the wrap up process by:
+
+1. Marking all events that have been completely handled as complete.
+2. Updating the progress on all events that have been partially worked on. If there is already progress update it with a full holistic view that includes both the past progress and the current progress, do not just overwrite it with what you have done in this session.
+3. Events that you were unable to make progress on just leave untouched.
+
+Once you have done this you can stop.
+`;
+
+/** Filename for the wrap_up prompt template */
+const WRAP_UP_FILENAME = "wrap_up.md";
+
+/**
+ * Ensures the wrap_up prompt template exists in the agent directory.
+ * Creates the prompts directory and wrap_up.md file if they don't exist.
+ *
+ * @param agentDir - The agent directory path (e.g., ~/.otterassist/agent)
+ * @param logger - Optional logger for debug output
+ */
+export async function ensureWrapUpPrompt(
+  agentDir: string,
+  logger?: Logger,
+): Promise<void> {
+  const promptsDir = join(agentDir, "prompts");
+  const wrapUpPath = join(promptsDir, WRAP_UP_FILENAME);
+
+  try {
+    // Create prompts directory if it doesn't exist
+    await mkdir(promptsDir, { recursive: true });
+
+    // Check if wrap_up.md already exists
+    const file = Bun.file(wrapUpPath);
+    const exists = await file.exists();
+
+    if (!exists) {
+      // Write the wrap_up prompt template
+      await Bun.write(wrapUpPath, WRAP_UP_PROMPT);
+      logger?.debug(`Created wrap_up prompt template at ${wrapUpPath}`);
+    }
+  } catch (error) {
+    // Log warning but don't fail - the agent can still run without the prompt
+    logger?.warn(
+      `Failed to ensure wrap_up prompt: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
+}
 
 /** System prompt for the OtterAssist agent */
 const OTTERASSIST_SYSTEM_PROMPT = `You are OtterAssist, an AI agent that processes events from a queue. You help users by reading files, executing commands, editing code, and writing new files.
@@ -127,6 +179,9 @@ export class AgentRunner {
    * @returns Result of the agent run
    */
   async run(events: Event[]): Promise<AgentRunResult> {
+    // Ensure wrap_up prompt template exists
+    await ensureWrapUpPrompt(this.agentDir, this.logger);
+
     if (events.length === 0) {
       this.logger.debug("No events to process");
       return { eventsProcessed: [], success: true };

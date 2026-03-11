@@ -2,9 +2,12 @@
  * Tests for Agent Runner
  */
 
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Event, EventQueue, Logger } from "../types/index.ts";
-import { AgentRunner } from "./runner.ts";
+import { AgentRunner, ensureWrapUpPrompt, WRAP_UP_PROMPT } from "./runner.ts";
 
 // Mock logger
 const createMockLogger = (): Logger => ({
@@ -29,6 +32,100 @@ const createMockEventQueue = (): EventQueue => ({
   markComplete: mock(async () => {}),
   purgeCompleted: mock(async () => 0),
   close: mock(() => {}),
+});
+
+describe("ensureWrapUpPrompt", () => {
+  let tempDir: string;
+  let mockLogger: Logger;
+
+  beforeEach(async () => {
+    tempDir = join(tmpdir(), `otterassist-test-${Date.now()}`);
+    await mkdir(tempDir, { recursive: true });
+    mockLogger = createMockLogger();
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("should create prompts directory if it doesn't exist", async () => {
+    const agentDir = join(tempDir, "agent");
+    // Don't create prompts dir beforehand
+    await ensureWrapUpPrompt(agentDir, mockLogger);
+
+    const wrapUpPath = join(agentDir, "prompts", "wrap_up.md");
+    const file = Bun.file(wrapUpPath);
+    const exists = await file.exists();
+    expect(exists).toBe(true); // File exists implies directory was created
+  });
+
+  it("should write correct content to wrap_up.md", async () => {
+    const agentDir = join(tempDir, "agent");
+    await ensureWrapUpPrompt(agentDir, mockLogger);
+
+    const wrapUpPath = join(agentDir, "prompts", "wrap_up.md");
+    const file = Bun.file(wrapUpPath);
+    const content = await file.text();
+
+    expect(content).toBe(WRAP_UP_PROMPT);
+    expect(content).toContain("Wrap up the current session");
+    expect(content).toContain(
+      "Marking all events that have been completely handled",
+    );
+  });
+
+  it("should not overwrite existing wrap_up.md", async () => {
+    const agentDir = join(tempDir, "agent");
+    const promptsDir = join(agentDir, "prompts");
+    const wrapUpPath = join(promptsDir, "wrap_up.md");
+
+    // Create existing file with custom content
+    await mkdir(promptsDir, { recursive: true });
+    const customContent = "---\ndescription: Custom\n---\nCustom content";
+    await Bun.write(wrapUpPath, customContent);
+
+    await ensureWrapUpPrompt(agentDir, mockLogger);
+
+    const file = Bun.file(wrapUpPath);
+    const content = await file.text();
+    expect(content).toBe(customContent);
+  });
+
+  it("should work without a logger", async () => {
+    const agentDir = join(tempDir, "agent");
+    await ensureWrapUpPrompt(agentDir);
+
+    const wrapUpPath = join(agentDir, "prompts", "wrap_up.md");
+    const file = Bun.file(wrapUpPath);
+    const exists = await file.exists();
+    expect(exists).toBe(true);
+  });
+});
+
+describe("WRAP_UP_PROMPT", () => {
+  it("should have correct description in frontmatter", () => {
+    expect(WRAP_UP_PROMPT).toContain(
+      "description: Wrap up the current session and update event progress",
+    );
+  });
+
+  it("should instruct to mark complete events as complete", () => {
+    expect(WRAP_UP_PROMPT).toContain(
+      "Marking all events that have been completely handled as complete",
+    );
+  });
+
+  it("should instruct to update progress holistically", () => {
+    expect(WRAP_UP_PROMPT).toContain(
+      "If there is already progress update it with a full holistic view",
+    );
+  });
+
+  it("should instruct to leave untouched events alone", () => {
+    expect(WRAP_UP_PROMPT).toContain(
+      "Events that you were unable to make progress on just leave untouched",
+    );
+  });
 });
 
 describe("AgentRunner", () => {
