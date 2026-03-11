@@ -25,7 +25,9 @@ export {
   type AgentRunnerOptions,
   type AgentRunResult,
   DEFAULT_AGENT_DIR,
+  ensureWrapUpPrompt,
   type Runner,
+  WRAP_UP_PROMPT,
 } from "./core/runner.ts";
 export { Scheduler } from "./core/scheduler.ts";
 
