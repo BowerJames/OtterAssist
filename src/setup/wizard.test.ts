@@ -12,11 +12,15 @@ const mockExtensions: ExtensionInfo[] = [
     name: "test-extension",
     description: "A test extension",
     path: "/tmp/test-extension.ts",
+    allowDisable: true,
+    isBuiltin: false,
   },
   {
     name: "another-extension",
     description: "Another test extension",
     path: "/tmp/another-extension.ts",
+    allowDisable: true,
+    isBuiltin: false,
   },
 ];
 

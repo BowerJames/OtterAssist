@@ -5,6 +5,15 @@
  * by an AI agent on a scheduled basis.
  */
 
+// Re-export builtins
+export {
+  BUILTIN_EXTENSIONS,
+  contextThreshold,
+  getOptionalExtensions,
+  getRequiredExtensions,
+  wrapUpManager,
+  wrapUpState,
+} from "./builtins/index.ts";
 // Re-export CLI
 export { parseArgs, runCli } from "./cli/index.ts";
 export { loadConfig, saveConfig } from "./config/loader.ts";
@@ -33,7 +42,6 @@ export {
   WRAP_UP_PROMPT,
 } from "./core/runner.ts";
 export { Scheduler } from "./core/scheduler.ts";
-
 // Re-export event management tools
 export {
   createCompleteEventTool,

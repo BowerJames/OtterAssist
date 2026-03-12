@@ -2,6 +2,7 @@
  * Extension manager - handles lifecycle of OtterAssist extensions
  * @see Issue #4 (original event source extensions)
  * @see Issue #23 (enhanced extension system with pi integration)
+ * @see Issue #37 (built-in extensions for wrap-up coordination)
  */
 
 import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
@@ -9,6 +10,7 @@ import { CONFIG_DIR } from "../config/loader.ts";
 import type { Config, Logger, OAExtensionContext } from "../types/index.ts";
 import {
   discoverExtensions,
+  getBuiltinExtensions,
   type LoadedExtension,
   loadExtension,
 } from "./loader.ts";
@@ -18,6 +20,7 @@ import {
  *
  * Handles:
  * - Discovery and loading of extensions from disk
+ * - Loading of built-in extensions (always available)
  * - Lifecycle management (initialize, poll, shutdown)
  * - Separation of event sources and pi extensions
  */
@@ -39,21 +42,81 @@ export class ExtensionManager {
   /**
    * Discovers, loads, filters, and initializes all extensions.
    *
+   * Loading order:
+   * 1. Built-in extensions with allowDisable: false (always loaded)
+   * 2. Built-in extensions with allowDisable: true (check config)
+   * 3. User-installed extensions from filesystem (check config)
+   *
    * For each enabled extension:
    * 1. Loads the extension module
    * 2. Initializes the event source (if present)
    * 3. Collects pi extension function (if present)
    */
   async loadAll(): Promise<void> {
-    this.logger.info("Discovering extensions...");
+    this.logger.info("Loading extensions...");
 
+    // Load built-in extensions first
+    await this.loadBuiltinExtensions();
+
+    // Then load user-installed extensions from filesystem
+    await this.loadUserExtensions();
+
+    this.logger.info(
+      `Loaded ${this.extensions.size} extension(s), ${this.piExtensions.length} with pi integration`,
+    );
+  }
+
+  /**
+   * Loads built-in extensions that ship with OtterAssist.
+   */
+  private async loadBuiltinExtensions(): Promise<void> {
+    const builtins = getBuiltinExtensions();
+    this.logger.debug(`Found ${builtins.length} built-in extension(s)`);
+
+    for (const extension of builtins) {
+      const extensionName = extension.name;
+
+      // Required extensions are always loaded
+      if (!extension.allowDisable) {
+        this.logger.debug(
+          `Loading required built-in extension: ${extensionName}`,
+        );
+        await this.registerExtension(extension, undefined);
+        continue;
+      }
+
+      // Optional built-ins check config like user extensions
+      const extensionConfig = this.config.extensions[extensionName];
+      if (!extensionConfig?.enabled) {
+        this.logger.debug(
+          `Built-in extension "${extensionName}" is disabled, skipping`,
+        );
+        continue;
+      }
+
+      await this.registerExtension(extension, extensionConfig.config);
+    }
+  }
+
+  /**
+   * Loads user-installed extensions from the filesystem.
+   */
+  private async loadUserExtensions(): Promise<void> {
     const extensionPaths = await discoverExtensions();
-    this.logger.info(`Found ${extensionPaths.length} extension(s)`);
+    this.logger.debug(`Found ${extensionPaths.length} user extension(s)`);
 
     for (const path of extensionPaths) {
       try {
         const extension = await loadExtension(path);
         const extensionName = extension.name;
+
+        // Skip if already loaded (built-in takes precedence)
+        if (this.extensions.has(extensionName)) {
+          this.logger.debug(
+            `Extension "${extensionName}" already loaded (built-in), skipping user version`,
+          );
+          continue;
+        }
 
         // Check if extension is enabled in config
         const extensionConfig = this.config.extensions[extensionName];
@@ -72,44 +135,53 @@ export class ExtensionManager {
           );
         }
 
-        // Initialize the event source if present
-        if (extension.events?.initialize) {
-          const context: OAExtensionContext = {
-            configDir: CONFIG_DIR,
-            logger: this.createExtensionLogger(extensionName),
-          };
-
-          const config = extensionConfig.config ?? extension.defaultConfig;
-          await extension.events.initialize(config, context);
-        }
-
-        // Store the extension
-        this.extensions.set(extensionName, extension);
-
-        // Collect pi extension function if present
-        if (extension.piExtension) {
-          this.piExtensions.push(extension.piExtension);
-          this.logger.debug(
-            `Extension "${extensionName}" registered pi extension`,
-          );
-        }
-
-        // Log loaded extension
-        const hasEvents = extension.events ? "events" : "";
-        const hasPi = extension.piExtension ? "pi" : "";
-        const capabilities = [hasEvents, hasPi].filter(Boolean).join("+");
-        const version = extension.version ? ` v${extension.version}` : "";
-
-        this.logger.info(
-          `Loaded extension: ${extensionName}${version} - ${extension.description} [${capabilities || "empty"}]`,
+        await this.registerExtension(
+          extension,
+          extensionConfig.config ?? extension.defaultConfig,
         );
       } catch (error) {
         this.logger.error(`Failed to load extension from ${path}:`, error);
       }
     }
+  }
+
+  /**
+   * Registers an extension (initializes event source, collects pi extension).
+   */
+  private async registerExtension(
+    extension: LoadedExtension,
+    config: unknown,
+  ): Promise<void> {
+    const extensionName = extension.name;
+
+    // Initialize the event source if present
+    if (extension.events?.initialize) {
+      const context: OAExtensionContext = {
+        configDir: CONFIG_DIR,
+        logger: this.createExtensionLogger(extensionName),
+      };
+
+      await extension.events.initialize(config, context);
+    }
+
+    // Store the extension
+    this.extensions.set(extensionName, extension);
+
+    // Collect pi extension function if present
+    if (extension.piExtension) {
+      this.piExtensions.push(extension.piExtension);
+      this.logger.debug(`Extension "${extensionName}" registered pi extension`);
+    }
+
+    // Log loaded extension
+    const hasEvents = extension.events ? "events" : "";
+    const hasPi = extension.piExtension ? "pi" : "";
+    const capabilities = [hasEvents, hasPi].filter(Boolean).join("+");
+    const version = extension.version ? ` v${extension.version}` : "";
+    const builtin = extension.isBuiltin ? " [built-in]" : "";
 
     this.logger.info(
-      `Loaded ${this.extensions.size} extension(s), ${this.piExtensions.length} with pi integration`,
+      `Loaded extension: ${extensionName}${version}${builtin} - ${extension.description} [${capabilities || "empty"}]`,
     );
   }
 
