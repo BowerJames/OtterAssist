@@ -31,6 +31,7 @@ export {
 export {
   discoverExtensions,
   GLOBAL_EXTENSIONS_DIR,
+  getBuiltinExtensions,
   LOCAL_EXTENSIONS_DIR,
   type LoadedExtension,
   loadExtension,

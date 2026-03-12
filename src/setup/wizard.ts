@@ -12,7 +12,11 @@ import {
   loadConfig,
   saveConfig,
 } from "../config/loader.ts";
-import { discoverExtensions, loadExtension } from "../extensions/index.ts";
+import {
+  discoverExtensions,
+  getBuiltinExtensions,
+  loadExtension,
+} from "../extensions/index.ts";
 import type { Config } from "../types/index.ts";
 import { createExtensionsScreen } from "./screens/extensions.ts";
 import { createPollIntervalScreen } from "./screens/poll-interval.ts";
@@ -26,6 +30,10 @@ export interface ExtensionInfo {
   name: string;
   description: string;
   path: string;
+  /** Whether this extension can be disabled by the user */
+  allowDisable: boolean;
+  /** Whether this is a built-in extension */
+  isBuiltin: boolean;
 }
 
 /**
@@ -247,19 +255,42 @@ export async function isFirstRun(configPath?: string): Promise<boolean> {
 
 /**
  * Discover and load extension info for the wizard
+ * Includes both built-in and user-installed extensions.
  * @returns Array of extension info objects
  */
 export async function discoverExtensionInfo(): Promise<ExtensionInfo[]> {
-  const extensionPaths = await discoverExtensions();
   const infos: ExtensionInfo[] = [];
+
+  // Add built-in extensions first
+  const builtins = getBuiltinExtensions();
+  for (const ext of builtins) {
+    infos.push({
+      name: ext.name,
+      description: ext.description,
+      path: "(built-in)",
+      allowDisable: ext.allowDisable,
+      isBuiltin: true,
+    });
+  }
+
+  // Then add user-installed extensions from filesystem
+  const extensionPaths = await discoverExtensions();
 
   for (const path of extensionPaths) {
     try {
       const ext = await loadExtension(path);
+
+      // Skip if already in list (built-in takes precedence)
+      if (infos.some((info) => info.name === ext.name)) {
+        continue;
+      }
+
       infos.push({
         name: ext.name,
         description: ext.description,
         path,
+        allowDisable: ext.allowDisable,
+        isBuiltin: ext.isBuiltin,
       });
     } catch (error) {
       // Skip extensions that fail to load

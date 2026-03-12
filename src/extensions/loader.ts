@@ -2,12 +2,14 @@
  * Extension loader - discovers and loads OtterAssist extensions
  * @see Issue #4 (original event source extensions)
  * @see Issue #23 (enhanced extension system with pi integration)
+ * @see Issue #37 (built-in extensions for wrap-up coordination)
  */
 
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
+import { BUILTIN_EXTENSIONS } from "../builtins/index.ts";
 import type {
   EventSourceExtension,
   OtterAssistExtension,
@@ -37,6 +39,10 @@ export interface LoadedExtension {
   version?: string;
   configSchema?: Record<string, unknown>;
   defaultConfig?: unknown;
+  /** Whether this extension can be disabled by the user */
+  allowDisable: boolean;
+  /** Whether this is a built-in extension (ships with OtterAssist) */
+  isBuiltin: boolean;
   /** Event source definition (may be undefined for pi-only extensions) */
   events?: {
     poll(): Promise<string[]>;
@@ -184,6 +190,45 @@ function isValidNewExtension(obj: unknown): obj is OtterAssistExtension {
 }
 
 /**
+ * Converts an OtterAssistExtension to LoadedExtension format.
+ */
+function extensionToLoaded(
+  extension: OtterAssistExtension,
+  isBuiltin: boolean,
+): LoadedExtension {
+  return {
+    name: extension.name,
+    description: extension.description,
+    version: extension.version,
+    configSchema: extension.configSchema,
+    defaultConfig: extension.defaultConfig,
+    allowDisable: extension.allowDisable !== false,
+    isBuiltin,
+    events: extension.events
+      ? {
+          poll: extension.events.poll.bind(extension.events),
+          initialize: extension.events.initialize?.bind(extension.events),
+          shutdown: extension.events.shutdown?.bind(extension.events),
+        }
+      : undefined,
+    piExtension: extension.piExtension as ExtensionFactory | undefined,
+    isLegacy: false,
+  };
+}
+
+/**
+ * Gets all built-in extensions as LoadedExtension objects.
+ *
+ * Built-in extensions ship with OtterAssist and are always available.
+ * They can be enabled/disabled via config (except those with allowDisable: false).
+ *
+ * @returns Array of built-in extensions in LoadedExtension format
+ */
+export function getBuiltinExtensions(): LoadedExtension[] {
+  return BUILTIN_EXTENSIONS.map((ext) => extensionToLoaded(ext, true));
+}
+
+/**
  * Loads an extension module and normalizes it to LoadedExtension format.
  *
  * Supports both formats:
@@ -205,22 +250,7 @@ export async function loadExtension(
 
     // Try new format first
     if (isValidNewExtension(extension)) {
-      return {
-        name: extension.name,
-        description: extension.description,
-        version: extension.version,
-        configSchema: extension.configSchema,
-        defaultConfig: extension.defaultConfig,
-        events: extension.events
-          ? {
-              poll: extension.events.poll.bind(extension.events),
-              initialize: extension.events.initialize?.bind(extension.events),
-              shutdown: extension.events.shutdown?.bind(extension.events),
-            }
-          : undefined,
-        piExtension: extension.piExtension,
-        isLegacy: false,
-      };
+      return extensionToLoaded(extension, false);
     }
 
     // Fall back to legacy format
@@ -230,6 +260,8 @@ export async function loadExtension(
         description: extension.description,
         configSchema: extension.configSchema,
         defaultConfig: extension.defaultConfig,
+        allowDisable: true,
+        isBuiltin: false,
         events: {
           poll: extension.poll.bind(extension),
           initialize: extension.initialize?.bind(extension),

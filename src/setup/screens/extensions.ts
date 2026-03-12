@@ -37,13 +37,28 @@ class ExtensionsScreen extends Container implements ScreenComponent {
     this.state = state;
     this.extensions = extensions;
 
-    // Build settings items
-    const items: SettingItem[] = extensions.map((ext) => ({
-      id: ext.name,
-      label: ext.name,
-      currentValue: state.extensions.get(ext.name)?.enabled ? "on" : "off",
-      values: ["on", "off"] as const,
-    }));
+    // Build settings items - non-disableable extensions show as locked
+    const items: SettingItem[] = extensions.map((ext) => {
+      const isRequired = !ext.allowDisable;
+
+      if (isRequired) {
+        // Required extensions show as "required" and cannot be toggled
+        return {
+          id: ext.name,
+          label: `${ext.name} 🔒`,
+          currentValue: "required",
+          values: ["required"] as const,
+        };
+      }
+
+      // Optional extensions can be toggled
+      return {
+        id: ext.name,
+        label: ext.isBuiltin ? `${ext.name} (built-in)` : ext.name,
+        currentValue: state.extensions.get(ext.name)?.enabled ? "on" : "off",
+        values: ["on", "off"] as const,
+      };
+    });
 
     // Create settings list with theme
     this.settingsList = new SettingsList(
@@ -52,15 +67,20 @@ class ExtensionsScreen extends Container implements ScreenComponent {
       {
         label: (s: string, selected: boolean) =>
           selected ? theme.accent(theme.bold(s)) : theme.text(s),
-        value: (s: string, selected: boolean) =>
-          selected ? theme.accent(s) : theme.muted(s),
+        value: (s: string, selected: boolean) => {
+          if (s === "required") {
+            return theme.muted("required");
+          }
+          return selected ? theme.accent(s) : theme.muted(s);
+        },
         description: (s: string) => theme.dim(s),
         cursor: ">",
         hint: (s: string) => theme.dim(s),
       },
       (id: string, newValue: string) => {
         const ext = this.state.extensions.get(id);
-        if (ext) {
+        // Only allow toggling for optional extensions
+        if (ext?.info.allowDisable) {
           ext.enabled = newValue === "on";
         }
       },
@@ -102,6 +122,13 @@ class ExtensionsScreen extends Container implements ScreenComponent {
       this.addChild(
         new Text(
           this.theme.dim(`     Found ${this.extensions.length} extension(s)`),
+          0,
+          0,
+        ),
+      );
+      this.addChild(
+        new Text(
+          this.theme.dim("     🔒 = required, cannot be disabled"),
           0,
           0,
         ),

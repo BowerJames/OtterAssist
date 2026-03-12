@@ -163,19 +163,16 @@ export interface EventSourceDefinition {
  * This is the same function signature used by pi extensions.
  * It receives the ExtensionAPI and can register tools, skills, hooks, commands, etc.
  *
- * Import ExtensionAPI from pi:
+ * For proper type safety, import ExtensionAPI from pi:
  * ```typescript
  * import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
  * ```
  *
- * For proper type safety, import ExtensionFactory directly from pi:
- * ```typescript
- * import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
- * ```
- *
  * @see https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md
  */
-export type PiExtensionFunction = (pi: unknown) => void;
+export type PiExtensionFunction = (
+  pi: import("@mariozechner/pi-coding-agent").ExtensionAPI,
+) => void;
 
 /**
  * OtterAssist Extension - bundles event sources with pi capabilities.
@@ -237,6 +234,21 @@ export interface OtterAssistExtension {
 
   /** Optional default configuration values */
   defaultConfig?: unknown;
+
+  /**
+   * Whether this extension can be disabled by the user.
+   * Built-in extensions can set this to false to enforce always-on behavior.
+   * User-installed extensions default to true (can be disabled).
+   * @default true
+   */
+  allowDisable?: boolean;
+
+  /**
+   * Whether this is a built-in extension (ships with OtterAssist).
+   * This is set automatically for built-in extensions.
+   * @internal
+   */
+  isBuiltin?: boolean;
 
   /**
    * Event source: produces events for the queue.
