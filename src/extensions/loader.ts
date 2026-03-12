@@ -43,24 +43,44 @@ export interface LoadedExtension {
   allowDisable: boolean;
   /** Whether this is a built-in extension (ships with OtterAssist) */
   isBuiltin: boolean;
+  /** Whether this is a directory-based extension (can be configurable) */
+  isDirectory: boolean;
+  /** Path to the extension's directory (or parent dir for single-file extensions) */
+  extensionDir: string;
   /** Event source definition (may be undefined for pi-only extensions) */
   events?: {
     poll(): Promise<string[]>;
-    initialize?(config: unknown, context: unknown): Promise<void>;
+    initialize?(context: unknown): Promise<void>;
     shutdown?(): Promise<void>;
   };
   /** Pi extension factory (may be undefined for event-only extensions) */
   piExtension?: ExtensionFactory;
+  /** Top-level initialize for pi-only extensions (may be undefined) */
+  initialize?(context: unknown): Promise<void>;
+  /** Configure method (may be undefined for non-configurable extensions) */
+  configure?(context: unknown): Promise<boolean>;
   /** Whether this is a legacy-format extension */
   isLegacy: boolean;
 }
 
 /**
- * Discovers extensions from global and project-local directories
- * Returns paths to extension entry points
+ * Internal representation of a discovered extension path.
  */
-export async function discoverExtensions(): Promise<string[]> {
-  const discovered: Map<string, string> = new Map();
+interface DiscoveredExtension {
+  /** Path to the extension entry point (index.ts or file.ts) */
+  entryPath: string;
+  /** Path to the extension's directory (for directory-based extensions) */
+  extensionDir: string;
+  /** Whether this is a directory-based extension */
+  isDirectory: boolean;
+}
+
+/**
+ * Discovers extensions from global and project-local directories.
+ * Returns information about each discovered extension including whether it's directory-based.
+ */
+export async function discoverExtensions(): Promise<DiscoveredExtension[]> {
+  const discovered: Map<string, DiscoveredExtension> = new Map();
 
   // Scan global directory first
   await scanDirectory(GLOBAL_EXTENSIONS_DIR, discovered);
@@ -77,7 +97,7 @@ export async function discoverExtensions(): Promise<string[]> {
  */
 async function scanDirectory(
   dir: string,
-  discovered: Map<string, string>,
+  discovered: Map<string, DiscoveredExtension>,
 ): Promise<void> {
   if (!existsSync(dir)) {
     return;
@@ -93,7 +113,11 @@ async function scanDirectory(
       // Check if it's a .ts file directly
       if (entry.isFile() && entry.name.endsWith(".ts")) {
         const name = basename(entry.name, ".ts");
-        discovered.set(name, fullPath);
+        discovered.set(name, {
+          entryPath: fullPath,
+          extensionDir: dir, // Parent directory for single-file extensions
+          isDirectory: false,
+        });
         continue;
       }
 
@@ -101,7 +125,11 @@ async function scanDirectory(
       if (entry.isDirectory()) {
         const indexPath = join(fullPath, "index.ts");
         if (existsSync(indexPath)) {
-          discovered.set(entry.name, indexPath);
+          discovered.set(entry.name, {
+            entryPath: indexPath,
+            extensionDir: fullPath, // The directory itself
+            isDirectory: true,
+          });
         }
       }
     }
@@ -195,6 +223,8 @@ function isValidNewExtension(obj: unknown): obj is OtterAssistExtension {
 function extensionToLoaded(
   extension: OtterAssistExtension,
   isBuiltin: boolean,
+  extensionDir: string,
+  isDirectory: boolean,
 ): LoadedExtension {
   return {
     name: extension.name,
@@ -204,6 +234,8 @@ function extensionToLoaded(
     defaultConfig: extension.defaultConfig,
     allowDisable: extension.allowDisable !== false,
     isBuiltin,
+    isDirectory,
+    extensionDir,
     events: extension.events
       ? {
           poll: extension.events.poll.bind(extension.events),
@@ -212,6 +244,8 @@ function extensionToLoaded(
         }
       : undefined,
     piExtension: extension.piExtension as ExtensionFactory | undefined,
+    initialize: extension.initialize?.bind(extension),
+    configure: extension.configure?.bind(extension),
     isLegacy: false,
   };
 }
@@ -222,10 +256,16 @@ function extensionToLoaded(
  * Built-in extensions ship with OtterAssist and are always available.
  * They can be enabled/disabled via config (except those with allowDisable: false).
  *
+ * Built-in extensions are stored in ~/.otterassist/builtins/<name>/
+ *
  * @returns Array of built-in extensions in LoadedExtension format
  */
 export function getBuiltinExtensions(): LoadedExtension[] {
-  return BUILTIN_EXTENSIONS.map((ext) => extensionToLoaded(ext, true));
+  const builtinsDir = join(homedir(), ".otterassist", "builtins");
+
+  return BUILTIN_EXTENSIONS.map((ext) =>
+    extensionToLoaded(ext, true, join(builtinsDir, ext.name), true)
+  );
 }
 
 /**
@@ -235,22 +275,32 @@ export function getBuiltinExtensions(): LoadedExtension[] {
  * - Legacy EventSourceExtension (poll at top level)
  * - New OtterAssistExtension (events.poll + optional piExtension)
  *
- * @param extensionPath - Path to the extension module
+ * @param discovered - Discovered extension information
  * @returns Normalized LoadedExtension object
  */
 export async function loadExtension(
-  extensionPath: string,
+  discovered: DiscoveredExtension,
 ): Promise<LoadedExtension> {
+  const { entryPath, extensionDir, isDirectory } = discovered;
+
   try {
     // Bun can import TypeScript directly
-    const module = await import(extensionPath);
+    const module = await import(entryPath);
 
     // Support both default export and named export
     const extension = module.default ?? module.extension ?? module;
 
     // Try new format first
     if (isValidNewExtension(extension)) {
-      return extensionToLoaded(extension, false);
+      // Single-file extensions cannot have configure method
+      if (!isDirectory && extension.configure) {
+        throw new Error(
+          `Single-file extension at ${entryPath} cannot have a configure method. ` +
+            "Use directory format (extension/index.ts) for configurable extensions.",
+        );
+      }
+
+      return extensionToLoaded(extension, false, extensionDir, isDirectory);
     }
 
     // Fall back to legacy format
@@ -262,28 +312,68 @@ export async function loadExtension(
         defaultConfig: extension.defaultConfig,
         allowDisable: true,
         isBuiltin: false,
+        isDirectory,
+        extensionDir,
         events: {
           poll: extension.poll.bind(extension),
-          initialize: extension.initialize?.bind(extension),
+          // Legacy extensions have (config, context) signature, we ignore config now
+          initialize: extension.initialize
+            ? async (context: unknown) => {
+                // Legacy initialize expects (config, context), pass undefined for config
+                await extension.initialize!(undefined, context as import("../types/index.ts").ExtensionContext);
+              }
+            : undefined,
           shutdown: extension.shutdown?.bind(extension),
         },
         piExtension: undefined,
+        configure: undefined,
         isLegacy: true,
       };
     }
 
     // Neither format matched
     throw new Error(
-      `Module ${extensionPath} does not export a valid extension. ` +
+      `Module ${entryPath} does not export a valid extension. ` +
         "Expected OtterAssistExtension (name, description, events?, piExtension?) " +
         "or legacy EventSourceExtension (name, description, poll).",
     );
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(
-        `Failed to load extension from ${extensionPath}: ${error.message}`,
+        `Failed to load extension from ${entryPath}: ${error.message}`,
       );
     }
     throw error;
   }
+}
+
+/**
+ * Helper to load an extension from just an entry point path.
+ * Determines if it's a directory or file-based extension automatically.
+ *
+ * This is a convenience function for the installer and other code that
+ * has a path but doesn't need the full discovery process.
+ *
+ * @param entryPath - Path to the extension entry point (index.ts or file.ts)
+ * @returns Normalized LoadedExtension object
+ */
+export async function loadExtensionFromPath(
+  entryPath: string,
+): Promise<LoadedExtension> {
+  const { dirname, basename } = await import("node:path");
+  const { existsSync } = await import("node:fs");
+
+  // Determine if this is a directory-based or file-based extension
+  const dir = dirname(entryPath);
+  const fileName = basename(entryPath);
+
+  // If the file is named "index.ts", it's a directory-based extension
+  const isDirectory = fileName === "index.ts";
+  const extensionDir = isDirectory ? dir : dir;
+
+  return loadExtension({
+    entryPath,
+    extensionDir,
+    isDirectory,
+  });
 }

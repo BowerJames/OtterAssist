@@ -9,7 +9,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { loadConfig, saveConfig } from "../config/loader.ts";
 import type { Logger } from "../types/index.ts";
-import { GLOBAL_EXTENSIONS_DIR, loadExtension } from "./index.ts";
+import { GLOBAL_EXTENSIONS_DIR, loadExtensionFromPath } from "./index.ts";
 
 /**
  * Options for installing an extension
@@ -109,7 +109,7 @@ export async function installExtension(
   logger?.debug(`Entry point: ${entryPoint}`);
 
   // 3. Load and validate the extension
-  const loaded = await loadExtension(entryPoint);
+  const loaded = await loadExtensionFromPath(entryPoint);
   logger?.info(`Validated extension: ${loaded.name} - ${loaded.description}`);
 
   // 4. Check for existing installation
@@ -283,7 +283,7 @@ export async function listInstalledExtensions(
     const entryPoint = await findEntryPoint(extPath);
 
     try {
-      const loaded = await loadExtension(entryPoint);
+      const loaded = await loadExtensionFromPath(entryPoint);
       const stats = await lstat(extPath);
       const isSymlink = stats.isSymbolicLink();
 
@@ -320,7 +320,7 @@ export async function getInstalledExtension(
   }
 
   const entryPoint = await findEntryPoint(extPath);
-  const loaded = await loadExtension(entryPoint);
+  const loaded = await loadExtensionFromPath(entryPoint);
   const stats = await lstat(extPath);
   const isSymlink = stats.isSymbolicLink();
   const config = await loadConfig();

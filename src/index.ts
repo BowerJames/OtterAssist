@@ -51,6 +51,7 @@ export {
 export type {
   EventSourceDefinition,
   EventSourceExtension,
+  ExtensionConfigureContext,
   ExtensionContext,
   ExtensionFactory,
   OAExtensionContext,
@@ -74,6 +75,7 @@ export {
   type LoadedExtension,
   listInstalledExtensions,
   loadExtension,
+  loadExtensionFromPath,
   uninstallExtension,
 } from "./extensions/index.ts";
 // Re-export setup wizard

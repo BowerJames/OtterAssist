@@ -3,6 +3,7 @@
  * @see Issue #4 (original event source extensions)
  * @see Issue #23 (enhanced extension system with pi integration)
  * @see Issue #37 (built-in extensions for wrap-up coordination)
+ * @see Issue #39 (extension configuration support)
  */
 
 import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
@@ -81,7 +82,7 @@ export class ExtensionManager {
         this.logger.debug(
           `Loading required built-in extension: ${extensionName}`,
         );
-        await this.registerExtension(extension, undefined);
+        await this.registerExtension(extension);
         continue;
       }
 
@@ -94,7 +95,7 @@ export class ExtensionManager {
         continue;
       }
 
-      await this.registerExtension(extension, extensionConfig.config);
+      await this.registerExtension(extension);
     }
   }
 
@@ -102,12 +103,12 @@ export class ExtensionManager {
    * Loads user-installed extensions from the filesystem.
    */
   private async loadUserExtensions(): Promise<void> {
-    const extensionPaths = await discoverExtensions();
-    this.logger.debug(`Found ${extensionPaths.length} user extension(s)`);
+    const discoveredExtensions = await discoverExtensions();
+    this.logger.debug(`Found ${discoveredExtensions.length} user extension(s)`);
 
-    for (const path of extensionPaths) {
+    for (const discovered of discoveredExtensions) {
       try {
-        const extension = await loadExtension(path);
+        const extension = await loadExtension(discovered);
         const extensionName = extension.name;
 
         // Skip if already loaded (built-in takes precedence)
@@ -135,12 +136,9 @@ export class ExtensionManager {
           );
         }
 
-        await this.registerExtension(
-          extension,
-          extensionConfig.config ?? extension.defaultConfig,
-        );
+        await this.registerExtension(extension);
       } catch (error) {
-        this.logger.error(`Failed to load extension from ${path}:`, error);
+        this.logger.error(`Failed to load extension from ${discovered.entryPath}:`, error);
       }
     }
   }
@@ -148,20 +146,24 @@ export class ExtensionManager {
   /**
    * Registers an extension (initializes event source, collects pi extension).
    */
-  private async registerExtension(
-    extension: LoadedExtension,
-    config: unknown,
-  ): Promise<void> {
+  private async registerExtension(extension: LoadedExtension): Promise<void> {
     const extensionName = extension.name;
+
+    // Build the context for initialization
+    const context: OAExtensionContext = {
+      configDir: CONFIG_DIR,
+      extensionDir: extension.extensionDir,
+      logger: this.createExtensionLogger(extensionName),
+    };
 
     // Initialize the event source if present
     if (extension.events?.initialize) {
-      const context: OAExtensionContext = {
-        configDir: CONFIG_DIR,
-        logger: this.createExtensionLogger(extensionName),
-      };
+      await extension.events.initialize(context);
+    }
 
-      await extension.events.initialize(config, context);
+    // Initialize the extension (top-level) if present (for pi-only extensions)
+    if (extension.initialize) {
+      await extension.initialize(context);
     }
 
     // Store the extension
@@ -176,7 +178,8 @@ export class ExtensionManager {
     // Log loaded extension
     const hasEvents = extension.events ? "events" : "";
     const hasPi = extension.piExtension ? "pi" : "";
-    const capabilities = [hasEvents, hasPi].filter(Boolean).join("+");
+    const hasConfig = extension.configure ? "config" : "";
+    const capabilities = [hasEvents, hasPi, hasConfig].filter(Boolean).join("+");
     const version = extension.version ? ` v${extension.version}` : "";
     const builtin = extension.isBuiltin ? " [built-in]" : "";
 

@@ -62,6 +62,7 @@ export interface CliOptions {
   uninstall?: string;
   extensionsList: boolean;
   extensionShow?: string;
+  extensionConfigure?: string;
   enable?: string;
   disable?: string;
   // Built-ins wrap-up command
@@ -90,6 +91,7 @@ export function parseArgs(args: string[]): CliOptions {
     uninstall: undefined,
     extensionsList: false,
     extensionShow: undefined,
+    extensionConfigure: undefined,
     enable: undefined,
     disable: undefined,
     builtinsWrapUp: false,
@@ -152,6 +154,9 @@ export function parseArgs(args: string[]): CliOptions {
               i++;
             } else if (nextArg === "show" && args[i + 2]) {
               options.extensionShow = args[i + 2];
+              i += 2;
+            } else if (nextArg === "configure" && args[i + 2]) {
+              options.extensionConfigure = args[i + 2];
               i += 2;
             } else {
               // Treat unknown subcommand as list
@@ -234,8 +239,9 @@ COMMANDS:
 
   uninstall <name>    Uninstall an extension
 
-  extensions [list]   List installed extensions
-  extensions show     Show details for an extension
+  extensions [list]        List installed extensions
+  extensions show <name>   Show details for an extension
+  extensions configure <name>  Configure an extension (if supported)
 
   enable <name>       Enable an extension
   disable <name>      Disable an extension
@@ -651,6 +657,135 @@ async function runExtensionShow(name: string): Promise<void> {
 }
 
 /**
+ * Configure an extension
+ */
+async function runExtensionConfigure(name: string): Promise<void> {
+  const { ProcessTerminal, TUI } = await import("@mariozechner/pi-tui");
+  const { loadExtensionFromPath, getBuiltinExtensions, GLOBAL_EXTENSIONS_DIR } = await import("../extensions/index.ts");
+  const { existsSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { homedir } = await import("node:os");
+  const { defaultTheme } = await import("../setup/wizard.ts");
+
+  // First check built-in extensions
+  const builtins = getBuiltinExtensions();
+  const builtin = builtins.find(ext => ext.name === name);
+
+  if (builtin) {
+    // Built-in extension
+    if (!builtin.isDirectory) {
+      console.log(`🦦 Built-in extension "${name}" is not configurable (internal).`);
+      process.exit(1);
+    }
+
+    if (!builtin.configure) {
+      console.log(`🦦 Built-in extension "${name}" has no configuration options.`);
+      process.exit(1);
+    }
+
+    console.log(`🦦 Configuring built-in extension: ${name}\n`);
+
+    const logger = new ConsoleLogger("info");
+    const terminal = new ProcessTerminal();
+    const tui = new TUI(terminal);
+
+    try {
+      const saved = await builtin.configure({
+        extensionDir: builtin.extensionDir,
+        logger,
+        tui,
+        theme: defaultTheme,
+      });
+
+      if (saved) {
+        console.log(`✅ Configuration saved for "${name}"`);
+      } else {
+        console.log(`🦦 Configuration cancelled.`);
+      }
+    } catch (error) {
+      console.error(
+        `❌ Failed to configure extension: ${error instanceof Error ? error.message : error}`,
+      );
+      process.exit(1);
+    } finally {
+      tui.stop();
+    }
+    return;
+  }
+
+  // Check user-installed extensions
+  const extPath = join(GLOBAL_EXTENSIONS_DIR, name);
+
+  if (!existsSync(extPath)) {
+    console.log(`🦦 Extension "${name}" not found.`);
+    console.log(`   Run 'otterassist extensions list' to see available extensions.`);
+    process.exit(1);
+  }
+
+  // Find entry point
+  const indexPath = join(extPath, "index.ts");
+  const singleFilePath = join(extPath, `${name}.ts`);
+  const entryPoint = existsSync(indexPath) ? indexPath : singleFilePath;
+
+  if (!existsSync(entryPoint)) {
+    console.log(`🦦 Could not find extension entry point for "${name}".`);
+    process.exit(1);
+  }
+
+  // Load the extension
+  let extension;
+  try {
+    extension = await loadExtensionFromPath(entryPoint);
+  } catch (error) {
+    console.error(
+      `❌ Failed to load extension: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  }
+
+  // Check if directory-based
+  if (!extension.isDirectory) {
+    console.log(`🦦 Extension "${name}" is not configurable (single-file format).`);
+    console.log(`   Use directory format to enable configuration.`);
+    process.exit(1);
+  }
+
+  // Check if it has a configure method
+  if (!extension.configure) {
+    console.log(`🦦 Extension "${name}" has no configuration options.`);
+    process.exit(1);
+  }
+
+  console.log(`🦦 Configuring extension: ${name}\n`);
+
+  const logger = new ConsoleLogger("info");
+  const terminal = new ProcessTerminal();
+  const tui = new TUI(terminal);
+
+  try {
+    const saved = await extension.configure({
+      extensionDir: extension.extensionDir,
+      logger,
+      tui,
+      theme: defaultTheme,
+    });
+
+    if (saved) {
+      console.log(`✅ Configuration saved for "${name}"`);
+    } else {
+      console.log(`🦦 Configuration cancelled.`);
+    }
+  } catch (error) {
+    console.error(
+      `❌ Failed to configure extension: ${error instanceof Error ? error.message : error}`,
+    );
+    process.exit(1);
+  } finally {
+    tui.stop();
+  }
+}
+
+/**
  * Enable an extension
  */
 async function runEnable(name: string): Promise<void> {
@@ -805,6 +940,12 @@ export async function runCli(): Promise<void> {
   // Handle extension show
   if (options.extensionShow) {
     await runExtensionShow(options.extensionShow);
+    process.exit(0);
+  }
+
+  // Handle extension configure
+  if (options.extensionConfigure) {
+    await runExtensionConfigure(options.extensionConfigure);
     process.exit(0);
   }
 

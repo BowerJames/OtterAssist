@@ -9,6 +9,7 @@ export type {
   EventSourceDefinition,
   // Legacy format (deprecated)
   EventSourceExtension,
+  ExtensionConfigureContext,
   ExtensionContext,
   OAExtensionContext,
   // New format
@@ -35,6 +36,7 @@ export {
   LOCAL_EXTENSIONS_DIR,
   type LoadedExtension,
   loadExtension,
+  loadExtensionFromPath,
 } from "./loader.ts";
 // Re-export manager
 export { ExtensionManager } from "./manager.ts";

@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { discoverExtensions, loadExtension } from "./loader.ts";
+import { discoverExtensions, loadExtensionFromPath } from "./loader.ts";
 
 const TEST_DIR = join(import.meta.dir, "__test_extensions__");
 
@@ -114,7 +114,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    const extension = await loadExtension(tempPath);
+    const extension = await loadExtensionFromPath(tempPath);
 
     expect(extension.name).toBe("valid-legacy-extension");
     expect(extension.description).toBe("A valid legacy test extension");
@@ -156,7 +156,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    const extension = await loadExtension(tempPath);
+    const extension = await loadExtensionFromPath(tempPath);
 
     expect(extension.name).toBe("new-events-only");
     expect(extension.description).toBe("New format with events only");
@@ -187,7 +187,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    const extension = await loadExtension(tempPath);
+    const extension = await loadExtensionFromPath(tempPath);
 
     expect(extension.name).toBe("new-pi-only");
     expect(extension.description).toBe("New format with pi extension only");
@@ -220,7 +220,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    const extension = await loadExtension(tempPath);
+    const extension = await loadExtensionFromPath(tempPath);
 
     expect(extension.name).toBe("new-full");
     expect(extension.isLegacy).toBe(false);
@@ -247,7 +247,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    await expect(loadExtension(tempPath)).rejects.toThrow(
+    await expect(loadExtensionFromPath(tempPath)).rejects.toThrow(
       "does not export a valid extension",
     );
 
@@ -268,7 +268,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    await expect(loadExtension(tempPath)).rejects.toThrow(
+    await expect(loadExtensionFromPath(tempPath)).rejects.toThrow(
       "does not export a valid extension",
     );
 
@@ -287,7 +287,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    await expect(loadExtension(tempPath)).rejects.toThrow(
+    await expect(loadExtensionFromPath(tempPath)).rejects.toThrow(
       "does not export a valid extension",
     );
 
@@ -309,7 +309,7 @@ export default {
 `;
     await writeFile(tempPath, extensionContent);
 
-    await expect(loadExtension(tempPath)).rejects.toThrow(
+    await expect(loadExtensionFromPath(tempPath)).rejects.toThrow(
       "does not export a valid extension",
     );
 
@@ -317,6 +317,6 @@ export default {
   });
 
   it("should throw for non-existent file", async () => {
-    await expect(loadExtension("/non/existent/file.ts")).rejects.toThrow();
+    await expect(loadExtensionFromPath("/non/existent/file.ts")).rejects.toThrow();
   });
 });

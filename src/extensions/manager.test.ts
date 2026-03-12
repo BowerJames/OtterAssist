@@ -81,8 +81,8 @@ export default {
     await writeFile(extensionPath, extensionContent);
 
     // Load the extension directly
-    const { loadExtension } = await import("./loader.ts");
-    const ext = await loadExtension(extensionPath);
+    const { loadExtensionFromPath } = await import("./loader.ts");
+    const ext = await loadExtensionFromPath(extensionPath);
 
     // Verify the extension loaded correctly
     expect(ext.name).toBe("enabled-extension");
@@ -153,8 +153,8 @@ export default {
 `;
     await writeFile(piExtPath, piExtContent);
 
-    const { loadExtension } = await import("./loader.ts");
-    const ext = await loadExtension(piExtPath);
+    const { loadExtensionFromPath } = await import("./loader.ts");
+    const ext = await loadExtensionFromPath(piExtPath);
 
     expect(ext.piExtension).toBeDefined();
     expect(ext.events).toBeUndefined();
@@ -180,8 +180,8 @@ export default {
 `;
     await writeFile(fullPath, content);
 
-    const { loadExtension } = await import("./loader.ts");
-    const ext = await loadExtension(fullPath);
+    const { loadExtensionFromPath } = await import("./loader.ts");
+    const ext = await loadExtensionFromPath(fullPath);
 
     expect(ext.events).toBeDefined();
     expect(ext.piExtension).toBeDefined();

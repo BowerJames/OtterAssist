@@ -92,16 +92,18 @@ export interface EventSourceExtension {
  *
  * @example
  * ```typescript
- * async initialize(config, context) {
+ * async initialize(context) {
  *   context.logger.info("Extension starting...");
- *   // configDir points to ~/.otterassist/
- *   const dataFile = join(context.configDir, "my-extension-data.json");
+ *   // extensionDir points to the extension's directory for config storage
+ *   const configFile = join(context.extensionDir, "config.json");
  * }
  * ```
  */
 export interface OAExtensionContext {
   /** Path to the OtterAssist config directory (~/.otterassist/) */
   configDir: string;
+  /** Path to this extension's directory (for config storage) */
+  extensionDir: string;
   /** Prefixed logger for the extension (messages include extension name) */
   logger: Logger;
 }
@@ -120,9 +122,9 @@ export interface OAExtensionContext {
  *     const newItems = await checkForNewItems();
  *     return newItems.map(item => `New item detected: ${item.name}`);
  *   },
- *   async initialize(config, context) {
+ *   async initialize(context) {
  *     context.logger.info("Connecting to data source...");
- *     // Setup connections, state, etc.
+ *     // Load config from context.extensionDir, setup connections, etc.
  *   },
  *   async shutdown() {
  *     // Cleanup resources
@@ -144,11 +146,11 @@ export interface EventSourceDefinition {
   /**
    * Called once when the extension is loaded and enabled.
    * Use this to setup connections, load state, etc.
+   * Extensions are responsible for loading their own config from extensionDir.
    *
-   * @param config - Extension-specific configuration from config file
-   * @param context - OtterAssist context (logger, config dir, etc.)
+   * @param context - OtterAssist context (logger, extension dir, etc.)
    */
-  initialize?(config: unknown, context: OAExtensionContext): Promise<void>;
+  initialize?(context: OAExtensionContext): Promise<void>;
 
   /**
    * Called once when OtterAssist shuts down.
@@ -173,6 +175,42 @@ export interface EventSourceDefinition {
 export type PiExtensionFunction = (
   pi: import("@mariozechner/pi-coding-agent").ExtensionAPI,
 ) => void;
+
+/**
+ * Context provided to extension configure method.
+ *
+ * Extensions use this context to build their configuration TUI.
+ * The extension is responsible for reading/writing its own config
+ * from the extensionDir.
+ *
+ * @example
+ * ```typescript
+ * async configure(context: ExtensionConfigureContext) {
+ *   const config = await loadConfig(context.extensionDir);
+ *   // Build TUI, let user edit config
+ *   // On save: await saveConfig(context.extensionDir, newConfig);
+ *   return saved;
+ * }
+ * ```
+ */
+export interface ExtensionConfigureContext {
+  /** Path to this extension's directory (for config storage) */
+  extensionDir: string;
+  /** Prefixed logger for the extension */
+  logger: Logger;
+  /** TUI instance for building config UI */
+  tui: import("@mariozechner/pi-tui").TUI;
+  /** Theme for consistent styling (matches wizard theme) */
+  theme: {
+    accent: (s: string) => string;
+    text: (s: string) => string;
+    muted: (s: string) => string;
+    dim: (s: string) => string;
+    success: (s: string) => string;
+    error: (s: string) => string;
+    bold: (s: string) => string;
+  };
+}
 
 /**
  * OtterAssist Extension - bundles event sources with pi capabilities.
@@ -270,6 +308,38 @@ export interface OtterAssistExtension {
    * Import ExtensionAPI from "@mariozechner/pi-coding-agent"
    */
   piExtension?: PiExtensionFunction;
+
+  /**
+   * Initialize the extension.
+   *
+   * Called once when the extension is loaded and enabled.
+   * Use this to load configuration, setup connections, etc.
+   *
+   * For extensions with events, use events.initialize instead.
+   * This method is for pi-only extensions that need initialization.
+   *
+   * @param context - OtterAssist context (logger, extension dir, etc.)
+   */
+  initialize?(context: OAExtensionContext): Promise<void>;
+
+  /**
+   * Configuration UI: allows users to configure this extension.
+   *
+   * When provided, users can run `otterassist extension configure <name>`
+   * to launch a TUI for configuring the extension.
+   *
+   * Only directory-based extensions can be configurable.
+   * Single-file extensions cannot have a configure method.
+   *
+   * The extension is responsible for:
+   * - Reading its config from context.extensionDir
+   * - Building the TUI interface
+   * - Writing config back to context.extensionDir
+   *
+   * @param context - Configuration context with TUI and extension directory
+   * @returns true if config was saved, false if cancelled
+   */
+  configure?(context: ExtensionConfigureContext): Promise<boolean>;
 }
 
 // ============================================================================

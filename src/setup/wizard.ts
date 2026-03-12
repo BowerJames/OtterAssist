@@ -274,11 +274,11 @@ export async function discoverExtensionInfo(): Promise<ExtensionInfo[]> {
   }
 
   // Then add user-installed extensions from filesystem
-  const extensionPaths = await discoverExtensions();
+  const discoveredExtensions = await discoverExtensions();
 
-  for (const path of extensionPaths) {
+  for (const discovered of discoveredExtensions) {
     try {
-      const ext = await loadExtension(path);
+      const ext = await loadExtension(discovered);
 
       // Skip if already in list (built-in takes precedence)
       if (infos.some((info) => info.name === ext.name)) {
@@ -288,13 +288,13 @@ export async function discoverExtensionInfo(): Promise<ExtensionInfo[]> {
       infos.push({
         name: ext.name,
         description: ext.description,
-        path,
+        path: discovered.entryPath,
         allowDisable: ext.allowDisable,
         isBuiltin: ext.isBuiltin,
       });
     } catch (error) {
       // Skip extensions that fail to load
-      console.warn(`Failed to load extension from ${path}:`, error);
+      console.warn(`Failed to load extension from ${discovered.entryPath}:`, error);
     }
   }
 
