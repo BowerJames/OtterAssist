@@ -168,22 +168,20 @@ export default {
       ];
 
       // Find current selection index
-      let currentIndex = thresholdOptions.findIndex(
+      const currentIndex = thresholdOptions.findIndex(
         (opt) => opt.value === config.threshold,
       );
-      if (currentIndex === -1) currentIndex = 3; // Default to 80%
+      const selectedIndex = currentIndex === -1 ? 3 : currentIndex; // Default to 80%
 
       // Build settings items
       const items = [
         {
           id: "threshold",
           label: "Context Threshold",
-          currentValue: thresholdOptions[currentIndex]?.label ?? "80%",
+          currentValue: thresholdOptions[selectedIndex]?.label ?? "80%",
           values: thresholdOptions.map((o) => o.label),
         },
       ];
-
-      let saved = false;
 
       class ConfigScreen extends Container {
         private settingsList: InstanceType<typeof SettingsList>;
@@ -216,13 +214,9 @@ export default {
               }
             },
             async () => {
-              // Enter pressed - save and exit
-              await mkdir(context.extensionDir, { recursive: true });
-              await saveConfig(context.extensionDir, config);
-              currentConfig = config;
-              saved = true;
+              // onCancel - Escape pressed
               context.tui.stop();
-              resolve(true);
+              resolve(false);
             },
           );
 
@@ -263,7 +257,7 @@ export default {
           this.addChild(
             new Text(
               context.theme.dim(
-                "     ←/→ to change, Enter to save, Escape to cancel",
+                "     Space to change, Enter to save, Escape to cancel",
               ),
               0,
               0,
@@ -275,14 +269,27 @@ export default {
           if (matchesKey(data, Key.escape)) {
             context.tui.stop();
             resolve(false);
+          } else if (matchesKey(data, Key.enter)) {
+            // Enter saves and exits
+            mkdir(context.extensionDir, { recursive: true }).then(() =>
+              saveConfig(context.extensionDir, config).then(() => {
+                currentConfig = config;
+                context.tui.stop();
+                resolve(true);
+              })
+            );
           } else {
+            // Pass other input to settings list (Space to change, etc.)
             this.settingsList.handleInput(data);
           }
         }
       }
 
-      context.tui.addChild(new ConfigScreen());
-      context.tui.start();
+      // Add screen to TUI and set focus
+      const screen = new ConfigScreen();
+      context.tui.addChild(screen);
+      context.tui.setFocus(screen);
+      context.tui.requestRender();
     });
   },
 

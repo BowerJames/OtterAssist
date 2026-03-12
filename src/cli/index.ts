@@ -690,6 +690,9 @@ async function runExtensionConfigure(name: string): Promise<void> {
     const tui = new TUI(terminal);
 
     try {
+      // Start the TUI first
+      tui.start();
+
       const saved = await builtin.configure({
         extensionDir: builtin.extensionDir,
         logger,
@@ -763,6 +766,9 @@ async function runExtensionConfigure(name: string): Promise<void> {
   const tui = new TUI(terminal);
 
   try {
+    // Start the TUI first
+    tui.start();
+
     const saved = await extension.configure({
       extensionDir: extension.extensionDir,
       logger,
